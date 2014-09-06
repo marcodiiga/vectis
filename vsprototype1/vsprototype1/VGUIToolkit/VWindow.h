@@ -12,10 +12,12 @@ LRESULT CALLBACK WndProcRedirector( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp );
 class VWindow {
 public:
 	VWindow( int width, int height );
+	~VWindow();
 
 	void addControl( VControl* cnt );
 
 	HWND getHandle() { return m_hwnd; }
+	HBRUSH getBackgroundBrush() { return m_backgroundBrush; }
 
 	void show();
 
@@ -24,6 +26,8 @@ public:
 private:
 	HWND m_hwnd;
 	int m_width, m_height;
+	HBITMAP m_memBuffer;		// Handle to the device context used as internal buffer for double buffering
+	HBRUSH  m_backgroundBrush;  // Handle to the window background brush
 
 	// Controls owned by this window are stored in this vector. The iterator points to one
 	// element after the last control which is visible in the window. If there is no visible

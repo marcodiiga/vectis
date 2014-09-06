@@ -6,13 +6,14 @@
 class VCodeControl : public VControl {
 public:
 
-	VCodeControl( int x, int y, int cx, int cy );
+	VCodeControl();
 
 	void paint( HDC& hdc );
 
 	bool loadTextFile( std::string filePath );
 
+
 private:
 	std::string m_plainText;
-	HRGN m_clipRegion;
+	//HRGN m_clipRegion;
 };

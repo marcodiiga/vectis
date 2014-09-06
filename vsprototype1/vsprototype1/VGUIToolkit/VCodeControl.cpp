@@ -2,9 +2,11 @@
 #include <VGUIToolkit/VWindow.h>
 #include <fstream>
 
-VCodeControl::VCodeControl( int x, int y, int cx, int cy ) {
+VCodeControl::VCodeControl()
+{
+	m_controlRect.bottom = m_controlRect.left = m_controlRect.right = m_controlRect.top = -1;
 	// Create the clipping region for this control
-	m_clipRegion = CreateRectRgn(x,y,cx,cy);
+	//m_clipRegion = CreateRectRgn(10,10,200,200);
 	// DEBUG
 	loadTextFile("vsprototype1.cpp");
 }
@@ -14,12 +16,16 @@ VCodeControl::paint(HDC& hdc) {
 	// TODO: handle dimensions, drawing area (dpi stuff?) and rects
 	
 	// First select our clipping region
-	SelectClipRgn(hdc, m_clipRegion);
+	// CreateRectRgn (if needed)
+	//SelectClipRgn(hdc, m_clipRegion);
 
-	RECT rect;
-	rect.top = 
-	GetClientRect(m_parent->getHandle(), &rect);
-	Rectangle( hdc, rect.left,rect.top,  rect.right, rect.bottom);
+	// Draw control background
+	FillRect( hdc, &m_controlRect, m_parent->getBackgroundBrush() );
+
+	//RECT rect;
+	//rect.top = 
+	//GetRgnBox(m_clipRegion, &rect);
+	//Rectangle( hdc, rect.left,rect.top,  rect.right, rect.bottom);
 
 	if( !m_plainText.empty() ) {
 		// Render the file text

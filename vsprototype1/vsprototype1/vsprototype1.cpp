@@ -9,7 +9,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	VGUIToolkit vToolkit;
 	VWindow* win = vToolkit.createWindow(1000, 600);
 
-	win->addControl(new VCodeControl(10, 10, 200, 200));
+	win->addControl(new VCodeControl());
 	win->show();
 
     return 0;

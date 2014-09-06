@@ -6,7 +6,9 @@
 
 VWindow::VWindow( int width, int height ) 
 	: m_width(width)
-	, m_height(height) 
+	, m_height(height)
+	, m_memBuffer(0)
+	, m_backgroundBrush(0)
 {
 	// No visible controls for now
 	m_endVisible = m_controls.end();
@@ -21,7 +23,8 @@ VWindow::VWindow( int width, int height )
     wce.hInstance     = 0;
     wce.hIcon         = LoadIcon( NULL, IDI_APPLICATION );
     wce.hCursor       = LoadCursor( NULL, IDC_ARROW );
-    wce.hbrBackground = (HBRUSH)( CreateSolidBrush(RGB(23,24,20)) );
+	m_backgroundBrush = (HBRUSH)( CreateSolidBrush(RGB(23,24,20)) );
+    wce.hbrBackground = m_backgroundBrush;
     wce.lpszMenuName  = NULL;
     wce.lpszClassName = VWINCLASS;
     wce.hIconSm       = LoadIcon( NULL, IDI_APPLICATION );
@@ -29,6 +32,10 @@ VWindow::VWindow( int width, int height )
     if( !RegisterClassEx( &wce ) ) {
         throw std::runtime_error("Window registration failed");
     }
+}
+
+VWindow::~VWindow() {
+	DeleteObject(m_backgroundBrush);
 }
 
 namespace {
@@ -87,36 +94,90 @@ VWindow::VWinProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam ) {
         case WM_DESTROY:
             PostQuitMessage( 0 );
         break;
-		case WM_CREATE:
-			// If any additional control needs to be created first register its class BEFORE calling CreateWindowEx and then here:
-            //m_renderHandler = CreateWindow(m_renderClassEx.lpszClassName, NULL, WS_CHILD | WS_VISIBLE,
-			//	0, 0, 0, 0, m_windowHandler, 0, m_winClassEx.hInstance, NULL);
-            break;
+		case WM_CREATE: 
+		{
+			// Initialize the memory buffer used for double buffering to the maximum extent
+			HDC winHDC = GetDC(hwnd);
+			HDC screenHDC = GetDC(NULL);
+			int screenCX = GetDeviceCaps(screenHDC, HORZRES);
+			int screenCY = GetDeviceCaps(screenHDC, VERTRES);
+			m_memBuffer = CreateCompatibleBitmap(winHDC, screenCX, screenCY);
+			ReleaseDC(hwnd, winHDC);
+			ReleaseDC(NULL, screenHDC);
+
+			// Calculate each control extent
+			RECT rect;
+			GetClientRect(hwnd, &rect);
+			for( std::vector<VControl*>::iterator it = m_controls.begin(); it != m_endVisible; ++it )
+				(*it)->setControlRect(rect);
+			
+		} break;
 		case WM_ERASEBKGND:
-			return TRUE; // We handle this one in WM_PAINT
+			return TRUE; // Not needed when double buffering
 		break;
 		case WM_PAINT: 
 		{
-			// TODO: make this double rendering!
-
 			PAINTSTRUCT ps;
-			HDC hdc;
-			RECT rect;
-
-			GetClientRect( hwnd, &rect );
-			hdc = BeginPaint( hwnd, &ps );
-
-			// Background color
-			FillRect( hdc, &rect, CreateSolidBrush( RGB( 23,24,20 ) ) );
-	
-			// Draw all the visible controls
-			for( std::vector<VControl*>::iterator it = m_controls.begin(); 
-				 it != m_endVisible; ++it ) {
-					(*it)->paint( hdc );
-					OutputDebugString("Redrawing control..\n");
-			}
+			HDC hdc = BeginPaint(hwnd, &ps);
 			
-			EndPaint( hwnd, &ps );
+			//>DEBUG draw into the m_memBuffer
+			{
+			   HDC wDC = GetDC(hwnd);
+			   HDC bDC = CreateCompatibleDC(wDC);
+			   HBITMAP bOld = (HBITMAP)SelectObject(bDC,m_memBuffer);
+			   HBRUSH brush = CreateSolidBrush(RGB(255,0,0));
+
+			   // Draw background
+			   /*RECT rect;
+			   GetClientRect( hwnd, &rect );
+			   FillRect(bDC, &rect, m_backgroundBrush);*/
+
+			   // Disegna i controlli (c'è da rifarlo con l'update selettivo a seconda di dove clicca
+			   // l'utente, del callback di SetTimer (per il caret che blinka) e di cosa inserisce con tastiera
+			   for( std::vector<VControl*>::iterator it = m_controls.begin(); it != m_endVisible; ++it )
+					(*it)->paint( bDC );
+
+			   DeleteObject(brush);
+			   SelectObject(bDC, bOld);
+			   DeleteDC(bDC);
+			   ReleaseDC(hwnd,wDC);
+			}
+			//<DEBUG
+
+
+			// Create a compatible DC, associate it to the bitmap in the memory buffer and
+			// draw it to the client area
+			HDC tempDC = CreateCompatibleDC(hdc);
+			HBITMAP bOld = (HBITMAP)SelectObject(tempDC,m_memBuffer);
+
+			BitBlt(ps.hdc, ps.rcPaint.left, ps.rcPaint.top, ps.rcPaint.right, ps.rcPaint.bottom, tempDC, 0, 0, SRCCOPY);
+			OutputDebugString("BitBlt from m_memBuffer\n");
+
+			SelectObject(tempDC, bOld);
+			DeleteDC(tempDC);
+			ReleaseDC(hwnd,tempDC);
+
+			EndPaint(hwnd, &ps);
+
+
+			//PAINTSTRUCT ps;
+			//HDC hdc;
+			//RECT rect;
+
+			//GetClientRect( hwnd, &rect );
+			//hdc = BeginPaint( hwnd, &ps );
+
+			//// Background color
+			//FillRect( hdc, &rect, CreateSolidBrush( RGB( 23,24,20 ) ) );
+	
+			//// Draw all the visible controls
+			//for( std::vector<VControl*>::iterator it = m_controls.begin(); 
+			//	 it != m_endVisible; ++it ) {
+			//		(*it)->paint( hdc );
+			//		OutputDebugString("Redrawing control..\n");
+			//}
+			//
+			//EndPaint( hwnd, &ps );
 		} break;
 		case WM_SIZE:
 			// TODO: there's no need to redraw everything when shrinking down, and just redraw the new area when growing
