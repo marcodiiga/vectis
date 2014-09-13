@@ -2,6 +2,7 @@
 #define CUSTOMSCROLLBAR_H
 
 #include <QScrollBar>
+#include <QPlainTextEdit>
 
 
 #include <QCommonStyle>
@@ -129,10 +130,13 @@ class CustomScrollBar : public QScrollBar
 {
     Q_OBJECT
 public:
-    CustomScrollBar(QWidget *parent = 0);
+    CustomScrollBar(QPlainTextEdit *parent = 0);
 
 private:
     void paintEvent( QPaintEvent * event );
+    void resizeEvent ( QResizeEvent * event );
+
+    QPlainTextEdit* m_parent;
 signals:
 
 public slots:

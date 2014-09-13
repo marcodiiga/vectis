@@ -58,6 +58,10 @@ VMainWindow::VMainWindow(QWidget *parent) :
                 }\
                 "));*/
     ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
+    ui->plainTextEdit->verticalScrollBar()->resize(20,30);
+    ui->plainTextEdit->verticalScrollBar()->updateGeometry();
+   // rc.setWidth(rc.width()-44);
+    //setGeometry(rc);
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
@@ -69,4 +73,9 @@ void VMainWindow::paintEvent(QPaintEvent *)
 
 VMainWindow::~VMainWindow() {
     delete ui;
+}
+
+void VMainWindow::on_pushButton_clicked()
+{
+    ui->plainTextEdit->scroll(0, -18);
 }
