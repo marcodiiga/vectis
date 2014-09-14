@@ -17,11 +17,24 @@ CustomScrollBar::CustomScrollBar(QPlainTextEdit *parent) :
 }
 
 void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
+    // Rende la scrollbar più piccola di 4 units e la posiziona attaccata al lato destro
     QSize sz = event->size();
     sz.setWidth(sz.width()-4);
     resize(sz);
     move(static_cast<QWidget*>(parent())->width() - width(), 1);
-    qDebug() << event->oldSize() << " and " ;
+
+    // Ricalcolo il numero di righe visibili per il controllo testo resizato così com'è
+
+    // Hierarchy used to find the parent QPlainTextEdit widget
+    // QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
+    // As long as we don't insert frames or tables, blocks == lines
+    QTextBlock block = m_parent->document()->findBlockByNumber(0);
+    QTextLayout *layout = block.layout(); // Layout di una riga
+    QTextLine textLine = layout->lineAt(0);
+
+    m_maxNumLines = floor(qreal(m_parent->height()) / textLine.height());
+    qDebug() << "m_maxNumLines is now " << m_maxNumLines;
+
     QScrollBar::resizeEvent(event);
 }
 
@@ -35,88 +48,39 @@ void CustomScrollBar::paintEvent( QPaintEvent * event ) {
     p.fillRect( rc, QColor( 255, 255, 255, 50 ) );
     p.setCompositionMode (QPainter::CompositionMode_SourceOver);
 
+    // Calcolo la posizione dello slider
 
-    // Cerco il numero di righe visibili per il controllo testo resizato così com'è (22)
+    int extraBottomLines = m_maxNumLines - 1; // Righe extra per scrollare il testo fino a visualizzare solo una riga
+                                              // in alto
 
-    // Hierarchy used to find the parent QPlainTextEdit widget
-    // QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
-    // As long as we don't insert frames or tables, blocks == lines
-    QTextBlock block = m_parent->document()->findBlockByNumber(0);
-    QTextLayout *layout = block.layout(); // Layout di una riga
-    QTextLine textLine = layout->lineAt(0);
-    int maxNumLines = floor(qreal(m_parent->height()) / textLine.height());
-    //int additionalEmptyBottomLines = maxNumLines - 1;
-    int currentLinesNum = m_parent->document()->blockCount();
-    int extraBottomLines = maxNumLines - 1;
+    // Dato che maximum() è SEMPRE maggiore di value() (il numero di linee del controllo è sempre
+    // maggiore o uguale della prima riga visualizzata dalla view), posso esprimere il rapporto come
+    // posizione_iniziale_slider = altezza_view * (riga_view / max_righe)
+    float viewRelativePos = float(m_maxNumLines) * float(value()) / float(maximum() + extraBottomLines);
 
-    // Calcolo le linee PRIMA della view che scorre sul documento e le linee DOPO la view
-
-    int beforeWeight = value();
-    int afterWeight = ((currentLinesNum + (extraBottomLines)) - beforeWeight) - maxNumLines;
-
-    //if(currentLinesNum <= maxNumLines)
-    //    extraBottomLines = abs(maxNumLines - ((maxNumLines - 1) + currentLinesNum));
-    qDebug() << "Before il peso è: " << beforeWeight << " after invece è " << afterWeight;
-
-
-    // Cerco la posizione centrale dello slider usando i due valori come pesi
-
-
-    float viewRelativePos = float(maxNumLines) -
-            (float(maxNumLines)+float(afterWeight)*0.5f - 0-float(beforeWeight)*0.5f)/2.0f;
-
-    // TODO: se questo valore è minore di zero, piazzalo a zero
-    // e quanto più si avvicina a maxNumLines, tanto meno deve essere incrementato. Dev'essere un limite!
-    if(viewRelativePos < 0)
-        viewRelativePos = 0;
-
+    // e ora trova la posizione assoluta nella rect del controllo
     // rect().height() : x = maxNumLines : viewRelativePos
-    float rectAbsPos = (float(rect().height())*viewRelativePos)/float(maxNumLines);
+    float rectAbsPos = (float(rect().height())*viewRelativePos)/float(m_maxNumLines);
 
-    qDebug() << "maxNumLines is " << maxNumLines << " and viewRelativePos is = " << viewRelativePos <<
-                " rectAbsPos = " << rectAbsPos;
-    QRect rcSlider(0, rectAbsPos, rect().width() - 1, 5 );
+    //qDebug() << "maxNumLines is " << maxNumLines << " and viewRelativePos is = " << viewRelativePos <<
+    //            " rectAbsPos = " << rectAbsPos;
+
+    // e ora calcolo la lunghezza della rect dello slider
+    int currentLinesNum = m_parent->document()->blockCount();
+    int lenSlider = int(float(rect().height()) * (float(m_maxNumLines) / float(currentLinesNum + extraBottomLines)));
+
+
+    // imposta un minimo di lunghezza per lo slider ed evita che vada disegnato fuori
+    if(lenSlider < 15)
+        lenSlider = 15;
+
+    if(rectAbsPos + lenSlider > rect().height())
+        rectAbsPos -= (rectAbsPos + lenSlider) - rect().height();
+
+    qDebug() << lenSlider;
+
+    QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
     p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
-
-    /*
-
-
-
-
-
-    //max-min : x = maxnumlines : value()
-
-    float sliderSize = 0.5f;
-    if(currentLinesNum <= maxNumLines)
-        sliderSize = 1.0f / (float(currentLinesNum + maxNumLines - 1) / float(maxNumLines));
-
-    float weightBefore = float((maximum()-minimum())*value()) / float(maxNumLines);
-    sliderSize -= weightBefore;
-
-    //qDebug() << "currentLinesNum = " << currentLinesNum << " maxNumLines = " << maxNumLines <<
-    //            " weightBefore = " << weightBefore << " sliderSize = " << sliderSize << "\n";
-
-    float pos = 0;
-    // value() : max()-min() = x : control_height()
-    QRect rcSlider(0, pos, rect().width() - 1, pos + (sliderSize*rect().height()));
-    p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
-
-
-    qDebug() << "maximum()-minimum() = " << maximum()-minimum() << " value() = " << value() <<
-                " rect().height() = " << rect().height() << " pos = " << pos << "\n";
-
-*/
-
-
-
-
-    //QTextLine line = layout->lineAt(0);
-    //qDebug() << line.height();
-    //qDebug() << "control has rect: " << rc << "\n";
-    //qDebug() << "control has lines: " << static_cast<QPlainTextEdit*>(this->parent())->document()->blockCount() <<
-    //            " maximum " << maximum() << " minimum " << minimum() << " pos " << pos;
-    //QRect rcSlider(0,pos, rect().width() - 1, pos+pageStep());
-    //p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
 
 
 /*    QPainter painter(this);

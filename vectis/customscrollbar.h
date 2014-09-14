@@ -137,6 +137,7 @@ private:
     void resizeEvent ( QResizeEvent * event );
 
     QPlainTextEdit* m_parent;
+    int m_maxNumLines;
 signals:
 
 public slots:
