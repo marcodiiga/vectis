@@ -18,13 +18,6 @@ CustomScrollBar::CustomScrollBar(QPlainTextEdit *parent) :
 }
 
 void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
-    // Rende la scrollbar più piccola di 3 units e la posiziona attaccata al lato destro
-    QSize sz = event->size();
-    sz.setWidth(sz.width());
-    resize(sz);
-    move(static_cast<QWidget*>(parent())->width() - width(), 1);
-
-    // Ricalcolo il numero di righe visibili per il controllo testo resizato così com'è
 
     // Hierarchy used to find the parent QPlainTextEdit widget
     // QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
@@ -42,12 +35,11 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
 void CustomScrollBar::paintEvent( QPaintEvent * event ) {
 
     QPainter p( this );
-    QRect rc( 0, 0, rect().width() - 1, rect().height() - 1 );
 
     // Draw any scroll background - nota che per la trasparenza devi specificare come si blenda col background
-    p.setCompositionMode (QPainter::CompositionMode_Source);
-    p.fillRect( rc, QColor( 255, 255, 255, 50 ) );
-    p.setCompositionMode (QPainter::CompositionMode_SourceOver);
+    //p.setCompositionMode (QPainter::CompositionMode_Source);
+    //p.fillRect( rc, QColor( 255, 255, 255, 50 ) );
+    //p.setCompositionMode (QPainter::CompositionMode_SourceOver);
 
     // Calcolo la posizione dello slider
 
@@ -78,10 +70,27 @@ void CustomScrollBar::paintEvent( QPaintEvent * event ) {
     if(rectAbsPos + lenSlider > rect().height())
         rectAbsPos -= (rectAbsPos + lenSlider) - rect().height();
 
-    qDebug() << lenSlider;
+    //qDebug() << lenSlider;
 
     QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
     p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
+
+
+
+    ////// Routines di disegno ///////
+
+    // Disegna una linea di separazione di 1 px
+    QPen lp(QColor(29,29,29));
+    p.setPen(lp);
+    p.drawLine(rect().left(), rect().top(), rect().left(), rect().bottom());
+
+    // Leggero gradiente da sx a dx
+    QLinearGradient bkGrad(rect().topLeft(), rect().topRight());
+    bkGrad.setColorAt(0, QColor(33,33,33));
+    bkGrad.setColorAt(1, QColor(50,50,50));
+    QRect rc = rect();
+    rc.setLeft(rc.left()+1);
+    p.fillRect(rc, bkGrad);
 
 
 /*    QPainter painter(this);

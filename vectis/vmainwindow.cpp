@@ -63,10 +63,11 @@ VMainWindow::VMainWindow(QWidget *parent) :
                 }\
                 "));*/
     ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
-    ui->plainTextEdit->verticalScrollBar()->resize(20,30);
-    ui->plainTextEdit->verticalScrollBar()->updateGeometry();
-   // rc.setWidth(rc.width()-44);
-    //setGeometry(rc);
+    ui->plainTextEdit->verticalScrollBar()->setStyleSheet(QString("\
+                                                                    QScrollBar:vertical {\
+                                                                      width:15px;\
+                                                                    }"));
+
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
