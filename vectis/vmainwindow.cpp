@@ -25,9 +25,14 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                      background-color: #272822;                         \
                                      color: white;                                      \
                                      border: 0px;                                       \
-                                     font-family: Consolas, monospace;                  \
-                                     font-size: 15px;                                   \
+                                     font-size: 14px;                                   \
                                      }");
+    // Consolas è installato di default su tutti i sistemi Windows, ma non linux
+    // il matching engine di Qt tenterà di trovare Consolas o un monospace di rimpiazzo
+    // font-family: Consolas, monospace;
+    QFont font("Consolas");
+    font.setStyleHint(QFont::Monospace);
+    ui->plainTextEdit->setFont(font);
     ui->plainTextEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     //ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
     //QScrollBar *vertScrollBar = ui->plainTextEdit->verticalScrollBar();

@@ -2,6 +2,7 @@
 #include <QPainter>
 #include <QTextBlock>
 #include <QTextLayout>
+#include <QtCore/qmath.h>
 #include <QDebug>
 #include <QStyleOptionSlider>
 
@@ -17,9 +18,9 @@ CustomScrollBar::CustomScrollBar(QPlainTextEdit *parent) :
 }
 
 void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
-    // Rende la scrollbar più piccola di 4 units e la posiziona attaccata al lato destro
+    // Rende la scrollbar più piccola di 3 units e la posiziona attaccata al lato destro
     QSize sz = event->size();
-    sz.setWidth(sz.width()-4);
+    sz.setWidth(sz.width());
     resize(sz);
     move(static_cast<QWidget*>(parent())->width() - width(), 1);
 
@@ -32,7 +33,7 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
     QTextLayout *layout = block.layout(); // Layout di una riga
     QTextLine textLine = layout->lineAt(0);
 
-    m_maxNumLines = floor(qreal(m_parent->height()) / textLine.height());
+    m_maxNumLines = qFloor(qreal(m_parent->height()) / textLine.height());
     qDebug() << "m_maxNumLines is now " << m_maxNumLines;
 
     QScrollBar::resizeEvent(event);
