@@ -2,6 +2,7 @@
 #include "ui_vmainwindow.h"
 #include <QPainter>
 #include <QScrollArea>
+#include <QLayout>
 
 
 VMainWindow::VMainWindow(QWidget *parent) :
@@ -20,8 +21,13 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
+    // Crea il controllo code editor
+    m_customCodeEdit = new CustomCodeEdit(this);
+    m_customCodeEdit->setGeometry(10,20,740,400);
+    ui->verticalLayout->addWidget(m_customCodeEdit);
+
     // Set background color for the edit code control
-    ui->plainTextEdit->setStyleSheet("QPlainTextEdit {                                  \
+    m_customCodeEdit->setStyleSheet("QPlainTextEdit {                                  \
                                      background-color: #272822;                         \
                                      color: white;                                      \
                                      border: 0px;                                       \
@@ -32,8 +38,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
     // font-family: Consolas, monospace;
     QFont font("Consolas");
     font.setStyleHint(QFont::Monospace);
-    ui->plainTextEdit->setFont(font);
-    ui->plainTextEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    m_customCodeEdit->setFont(font);
+    m_customCodeEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     //ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
     //QScrollBar *vertScrollBar = ui->plainTextEdit->verticalScrollBar();
 
@@ -62,11 +68,11 @@ VMainWindow::VMainWindow(QWidget *parent) :
                     width: 4px;\
                 }\
                 "));*/
-    ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
-    ui->plainTextEdit->verticalScrollBar()->setStyleSheet(QString("\
-                                                                    QScrollBar:vertical {\
-                                                                      width:15px;\
-                                                                    }"));
+    m_customCodeEdit->setVerticalScrollBar(new CustomScrollBar(m_customCodeEdit));
+    m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
+                                                                  QScrollBar:vertical {\
+                                                                    width:15px;\
+                                                                  }"));
 
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
@@ -78,10 +84,11 @@ void VMainWindow::paintEvent(QPaintEvent *)
 }
 
 VMainWindow::~VMainWindow() {
+    delete m_customCodeEdit;
     delete ui;
 }
 
 void VMainWindow::on_pushButton_clicked()
 {
-    ui->plainTextEdit->scroll(0, -18);
+    //ui->plainTextEdit->scroll(0, -18);
 }

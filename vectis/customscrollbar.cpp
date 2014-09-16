@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QStyleOptionSlider>
 
-CustomScrollBar::CustomScrollBar(QPlainTextEdit *parent) :
+CustomScrollBar::CustomScrollBar (QPlainTextEdit *parent) :
     QScrollBar(parent),
     m_parent(parent)
 {
@@ -27,12 +27,27 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
     QTextLine textLine = layout->lineAt(0);
 
     m_maxNumLines = qFloor(qreal(m_parent->height()) / textLine.height());
-    qDebug() << "m_maxNumLines is now " << m_maxNumLines;
+    // Aggiorna anche il maximum per permettere di scrollare l'ultima riga fino all'inizio della view
+    setMaximum(m_parent->document()->blockCount() - 1);
+    //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
+
+    //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
 
     QScrollBar::resizeEvent(event);
 }
 
-void CustomScrollBar::paintEvent( QPaintEvent * event ) {
+void CustomScrollBar::sliderChange ( SliderChange change ) {
+    if(change == QAbstractSlider::SliderValueChange) {
+        // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
+        // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il range dello
+        // slider (e.g. righe aggiunte o tolte) e aumentare il massimo dove si può scrollare
+        setMaximum(m_parent->document()->blockCount() - 1);
+        //qDebug() << "maximum aggiornato a: " << maximum();
+    }
+    QAbstractSlider::sliderChange(change);
+}
+
+void CustomScrollBar::paintEvent ( QPaintEvent * event ) {
 
     QPainter p( this );
 
@@ -42,6 +57,11 @@ void CustomScrollBar::paintEvent( QPaintEvent * event ) {
     //p.setCompositionMode (QPainter::CompositionMode_SourceOver);
 
     // Calcolo la posizione dello slider
+    //qDebug() << "value : " << value() << "maximum() :" << maximum();
+    //if(value() == 2) {
+     //   this->setMaximum(22);
+        //this->setValue(22);
+    //}
 
     int extraBottomLines = m_maxNumLines - 1; // Righe extra per scrollare il testo fino a visualizzare solo una riga
                                               // in alto
@@ -72,8 +92,9 @@ void CustomScrollBar::paintEvent( QPaintEvent * event ) {
 
     //qDebug() << lenSlider;
 
+    // Disegno area dello slider
     QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
-    p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
+    //p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
 
 
 
@@ -91,6 +112,29 @@ void CustomScrollBar::paintEvent( QPaintEvent * event ) {
     QRect rc = rect();
     rc.setLeft(rc.left()+1);
     p.fillRect(rc, bkGrad);
+
+
+    // Routine di disegno per lo slider
+    // rcSlider è la hitbox, ma per il drawing ne prendiamo una sottosezione in larghezza
+    QRect rcSliderSubsection(rcSlider);
+    rcSliderSubsection.setX(rcSliderSubsection.x()+3);
+    rcSliderSubsection.setWidth(rcSliderSubsection.width()-2);
+    p.setRenderHint(QPainter::Antialiasing);
+    QPainterPath path;
+    path.setFillRule( Qt::WindingFill );
+    path.addRoundedRect( rcSliderSubsection, 4, 4 );
+
+    // seleziona un brush a gradiente
+    QLinearGradient fillGrad(rect().topLeft(), rect().topRight());
+    fillGrad.setColorAt(0, QColor(88,88,88));
+    fillGrad.setColorAt(1, QColor(64,64,64));
+    QBrush gradFill(fillGrad);
+    p.setBrush(gradFill);
+
+
+    //path.addRect( QRect( 200, 50, 50, 50 ) ); // Top right corner not rounded
+        //path.addRect( QRect( 50, 100, 50, 50 ) ); // Bottom left corner not rounded
+    p.drawPath( path.simplified() ); // Only Top left & bottom right corner rounded
 
 
 /*    QPainter painter(this);

@@ -133,8 +133,9 @@ public:
     CustomScrollBar(QPlainTextEdit *parent = 0);
 
 private:
-    void paintEvent( QPaintEvent * event );
+    void paintEvent ( QPaintEvent * event );
     void resizeEvent ( QResizeEvent * event );
+    void sliderChange ( SliderChange change );
 
     QPlainTextEdit* m_parent;
     int m_maxNumLines;

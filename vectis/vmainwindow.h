@@ -3,7 +3,8 @@
 
 #include <QDialog>
 #include <QPixmap>
-#include "customscrollbar.h"
+#include <customcodeedit.h>
+#include <customscrollbar.h>
 
 namespace Ui {
 class VMainWindow;
@@ -27,6 +28,7 @@ private slots:
 
 private:
     Ui::VMainWindow *ui;
+    CustomCodeEdit *m_customCodeEdit;
 };
 
 #endif // VMAINWINDOW_H
