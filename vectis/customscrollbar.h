@@ -2,7 +2,7 @@
 #define CUSTOMSCROLLBAR_H
 
 #include <QScrollBar>
-#include <QPlainTextEdit>
+#include <QTextEdit>
 
 
 #include <QCommonStyle>
@@ -130,15 +130,20 @@ class CustomScrollBar : public QScrollBar
 {
     Q_OBJECT
 public:
-    CustomScrollBar(QPlainTextEdit *parent = 0);
+    CustomScrollBar(QTextEdit * parent = 0);
 
 private:
     void paintEvent ( QPaintEvent * event );
     void resizeEvent ( QResizeEvent * event );
     void sliderChange ( SliderChange change );
 
-    QPlainTextEdit* m_parent;
+    QTextEdit * m_parent;
     int m_maxNumLines;
+    int m_textLineHeight;
+    int m_internalLineCount;
+
+private slots:
+
 signals:
 
 public slots:

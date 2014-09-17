@@ -27,7 +27,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
     ui->verticalLayout->addWidget(m_customCodeEdit);
 
     // Set background color for the edit code control
-    m_customCodeEdit->setStyleSheet("QPlainTextEdit {                                  \
+    m_customCodeEdit->setStyleSheet("QTextEdit {                                        \
                                      background-color: #272822;                         \
                                      color: white;                                      \
                                      border: 0px;                                       \
@@ -86,9 +86,4 @@ void VMainWindow::paintEvent(QPaintEvent *)
 VMainWindow::~VMainWindow() {
     delete m_customCodeEdit;
     delete ui;
-}
-
-void VMainWindow::on_pushButton_clicked()
-{
-    //ui->plainTextEdit->scroll(0, -18);
 }
