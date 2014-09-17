@@ -28,7 +28,7 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
 
     m_maxNumLines = qFloor(qreal(m_parent->height()) / textLine.height());
     // Aggiorna anche il maximum per permettere di scrollare l'ultima riga fino all'inizio della view
-    setMaximum(m_parent->document()->blockCount() - 1);
+    setMaximum(m_parent->document()->lineCount() - 1);
     //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
 
     //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
@@ -41,8 +41,8 @@ void CustomScrollBar::sliderChange ( SliderChange change ) {
         // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
         // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il range dello
         // slider (e.g. righe aggiunte o tolte) e aumentare il massimo dove si può scrollare
-        setMaximum(m_parent->document()->blockCount() - 1);
-        //qDebug() << "maximum aggiornato a: " << maximum();
+        setMaximum(m_parent->document()->lineCount() - 1);
+        //qDebug() << "lines: " << m_parent->document()->lineCount() << " blocks " << maximum();
     }
     QAbstractSlider::sliderChange(change);
 }
