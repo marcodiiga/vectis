@@ -3,6 +3,7 @@
 
 #include <QScrollBar>
 #include <QTextEdit>
+#include <QTimer>
 
 
 #include <QCommonStyle>
@@ -138,11 +139,16 @@ private:
     void sliderChange ( SliderChange change );
 
     QTextEdit * m_parent;
-    int m_maxNumLines;
-    int m_textLineHeight;
-    int m_internalLineCount;
+    int   m_maxNumLines;
+    qreal m_textLineHeight;
+    int   m_internalLineCount;
+    QTimer * m_scrollTimer;
+    struct scrollDv { int dx; int dy; } m_scrollDv;
 
 private slots:
+    void documentSizeChanged (const QSizeF & newSize );
+   // void scrollToValue ( int value );
+   // void timerScroll();
 
 signals:
 

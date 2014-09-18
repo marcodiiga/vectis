@@ -11,14 +11,9 @@ public:
     explicit CustomCodeEdit(QWidget *parent = 0);
 
 private:
-    //void scrollContentsBy ( int dx, int dy );
-
-    QTimer *m_scrollTimer;
-    struct scrollDv { int dx; int dy; } m_scrollDv;
+    void scrollContentsBy ( int dx, int dy ) override;
 
 private slots:
-    void scrollToStep();
-    void updateScrollBar();
 
 signals:
 

@@ -22,3 +22,5 @@ HEADERS  += vmainwindow.h \
     customcodeedit.h
 
 FORMS    += vmainwindow.ui
+
+QMAKE_CXXFLAGS += -std=c++11

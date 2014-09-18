@@ -3,8 +3,12 @@
 #include <QTextBlock>
 #include <QTextLayout>
 #include <QtCore/qmath.h>
+#include <QAbstractTextDocumentLayout>
 #include <QDebug>
 #include <QStyleOptionSlider>
+
+
+
 
 CustomScrollBar::CustomScrollBar ( QTextEdit * parent ) :
     QScrollBar(parent),
@@ -16,10 +20,65 @@ CustomScrollBar::CustomScrollBar ( QTextEdit * parent ) :
 
     //setAttribute( Qt::WA_TranslucentBackground );
     setAttribute( Qt::WA_OpaquePaintEvent, false );
-   // setStyle(new CustomStyle());
+
+    connect(m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
+            this, SLOT(documentSizeChanged(const QSizeF&)));
+    //m_scrollTimer = new QTimer(this);
+    //connect(m_scrollTimer, SIGNAL(timeout()), this, SLOT(timerScroll()));
+    //connect(this, SIGNAL(valueChanged(int)), this, SLOT(scrollToValue(int)));
 }
 
+/*
+void CustomScrollBar::scrollToValue ( int value ) {
+    qDebug() << "scrollToValue starting.. from " << this->value() << " to " << value;
+    m_scrollTimer->setProperty("valueToReach", value);
+    m_scrollTimer->start(1000);
+}
+
+void CustomScrollBar::timerScroll() {
+    int valueToReach = *static_cast<const int*>(m_scrollTimer->property("valueToReach").constData());
+    qDebug() << "[TIMER] reaching " << valueToReach;
+    if(value() == valueToReach)
+        m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
+    else {
+        if(value() < valueToReach)
+            setValue(value() + 1);
+        else
+            setValue(value() - 1);
+    }
+}
+*/
+// Quando il controllo viene resizato, si aggiorna anche il numero massimo di righe che possiamo visualizzare
+// entro la view
 void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
+   qDebug() << "TODO: resizeEvent per la ScrollBar, è utile il setMaximum qua? Se basta il docSizeChange rimuovilo";
+   // setMaximum( m_internalLineCount * m_textLineHeight );
+    //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
+
+    //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
+
+    //qDebug() << "textLine.height() is  " << m_textLineHeight;
+
+    QScrollBar::resizeEvent(event);
+}
+
+void CustomScrollBar::sliderChange ( SliderChange change ) {
+
+    // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
+    // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il valore dello
+    // slider (e.g. sto scrollando o aggiungo/tolgo righe oppure wrappo) e aumentare il massimo dove si può scrollare.
+    // Non posso fare un semplice m_internalLineCount = (m_parent->document()->lineCount() - 1);
+    // perchè non è sempre valido e in wrap mode crea problemi
+    setMaximum( (m_internalLineCount - 1) * m_textLineHeight );
+
+    //qDebug() << "sliderChange: maximum aggiornato a: " << maximum();
+
+    QAbstractSlider::sliderChange(change);
+}
+
+
+// Emesso quando il documento cambia size, è l'unico modo per rilevare il numero delle linee del documento con il wrapping
+void CustomScrollBar::documentSizeChanged(const QSizeF & newSize) {
 
     // Hierarchy used to find the parent QPlainTextEdit widget
     // QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
@@ -29,41 +88,25 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
     QTextLine textLine = layout->lineAt(0);
     m_textLineHeight = textLine.height();
     m_maxNumLines = qFloor(qreal(m_parent->height()) / m_textLineHeight);
+
     // Aggiorna anche il maximum per permettere di scrollare l'ultima riga fino all'inizio della view
-    m_internalLineCount = (m_parent->document()->lineCount() - 1);
-    setMaximum( m_internalLineCount * m_textLineHeight );
-    //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
+    m_internalLineCount = int(newSize.height() / m_textLineHeight);
+    setMaximum( (m_internalLineCount - 1)* m_textLineHeight );
 
-    //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
-
-    qDebug() << "textLine.height() is  " << m_textLineHeight;
-
-    QScrollBar::resizeEvent(event);
+    //qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxNumLines << " m_internalLineCount " << m_internalLineCount;
 }
 
-void CustomScrollBar::sliderChange ( SliderChange change ) {
-    // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
-    // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il valore dello
-    // slider (e.g. sto scrollando o aggiungo/tolgo righe oppure wrappo) e aumentare il massimo dove si può scrollare
-    m_internalLineCount = (m_parent->document()->lineCount() - 1);
-    setMaximum( m_internalLineCount * m_textLineHeight );
-
-    //qDebug() << "sliderChange: maximum aggiornato a: " << maximum();
-
-    QAbstractSlider::sliderChange(change);
-}
-#include <QPlainTextEdit>
 void CustomScrollBar::paintEvent ( QPaintEvent * event ) {
 
     QPainter p( this );
 
-    QPlainTextEdit ea(m_parent); // TODO: come cazzo si può rilevare il numero di righe se ho il word wrapping????
+    /*QPlainTextEdit ea(m_parent); // TODO: come cazzo si può rilevare il numero di righe se ho il word wrapping????
     int lineCount = ea.document()->lineCount();
     if(m_internalLineCount != lineCount) {
         qDebug() << lineCount;
         m_internalLineCount = lineCount;
         setMaximum( m_internalLineCount * m_textLineHeight );
-    }
+    }*/
 
     // Draw any scroll background - nota che per la trasparenza devi specificare come si blenda col background
     //p.setCompositionMode (QPainter::CompositionMode_Source);
@@ -92,8 +135,7 @@ void CustomScrollBar::paintEvent ( QPaintEvent * event ) {
     //            " rectAbsPos = " << rectAbsPos;
 
     // e ora calcolo la lunghezza della rect dello slider
-    int currentLinesNum = m_parent->document()->lineCount();
-    int lenSlider = int(float(rect().height()) * (float(m_maxNumLines) / float(currentLinesNum + extraBottomLines)));
+    int lenSlider = int(float(rect().height()) * (float(m_maxNumLines) / float(m_internalLineCount + extraBottomLines)));
 
     // imposta un minimo di lunghezza per lo slider ed evita che vada disegnato fuori
     if(lenSlider < 15)
