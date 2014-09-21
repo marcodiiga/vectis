@@ -27,11 +27,22 @@ CustomScrollBar::CustomScrollBar ( QTextEdit * parent ) :
     connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
     connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
-    m_scrollTimer = new QTimer(this);
-    connect(m_scrollTimer, SIGNAL(timeout()), this, SLOT(timerScroll()));
+
+    m_scrollAnim.reset(new QPropertyAnimation(this, "value"));
+    m_pgKeyEater.reset(new PgKeyEater(this));
+
+    // Installa il PageDown/PageUp key eater per il controllo parent
+    m_parent->installEventFilter(m_pgKeyEater.get());
+    connect(m_scrollAnim.get(), SIGNAL(finished()), this, SLOT(moveParentCaret()));
+    //m_scrollTimer = new QTimer(this);
+    //connect(m_scrollTimer, SIGNAL(timeout()), this, SLOT(timerScroll()));
     //connect(this, SIGNAL(valueChanged(int)), this, SLOT(scrollToValue(int)));
 
 
+}
+
+CustomScrollBar::~CustomScrollBar() {
+    m_parent->removeEventFilter(m_pgKeyEater.get());
 }
 
 namespace {
@@ -57,73 +68,97 @@ void CustomScrollBar::sliderPressed () {
     m_sliderIsBeingDragged = true;
 }
 
-
+// Sposta il caret (cursore) del parent alla posizione raggiunta dalla scrollbar.
+// Utile quando è stato chiamato un PageUp/PageDown
+void CustomScrollBar::moveParentCaret() {
+    int pageValue = m_scrollAnim->property("pageStepEvent").toInt();
+    if(pageValue > 0) { // PageDown o PageUp è stato premuto
+        QTextCursor cursor = m_parent->textCursor();
+        qDebug() << "value() / m_textLineHeight " << value() / m_textLineHeight;
+        cursor.movePosition( QTextCursor::Start, QTextCursor::MoveAnchor );
+        cursor.movePosition( QTextCursor::NextBlock, QTextCursor::MoveAnchor, value() / m_textLineHeight);
+        m_parent->setTextCursor(cursor);
+        m_scrollAnim->setProperty("pageStepEvent", 0);
+    }
+}
 
 // This happens whenever the slider is moved (mouse scrollbar / page down-up / dragging)
 void CustomScrollBar::actionTriggered ( int action ) {
-    qDebug() << "actionTriggered received action << " << action << " m_sliderIsBeingDragged = " << m_sliderIsBeingDragged <<
-                ", al momento del segnale value mi risulta: " << value();
+//    qDebug() << "actionTriggered received action << " << action << " m_sliderIsBeingDragged = " << m_sliderIsBeingDragged <<
+//                ", al momento del segnale value mi risulta: " << value();
     if(action == QAbstractSlider::SliderNoAction || m_sliderIsBeingDragged)
         return;
 
-    //disconnect(m_parent, SIGNAL())
+    if(m_scrollAnim->state() == QAbstractAnimation::State::Running)
+        m_scrollAnim->stop();
+    // Se l'animazione è stata triggerata da un PageDown/PageUp sarà necessario muovere il caret alla fine
+    //if(action == SliderPageStepAdd || action == SliderPageStepSub)
+    //    m_scrollAnim->setProperty("pageStepEvent", true);
+    m_scrollAnim->setDuration(120);
+    m_scrollAnim->setStartValue(value());
+    m_scrollAnim->setEndValue(sliderPosition());
 
-    // Lo slider si trova in value(), devo scrollarlo verso sliderPosition() in una serie di step
-    // quindi mi calcolo l'incremento da applicare ad ogni step
-    m_scrollTimer->setProperty("sliderDesiredPosition", sliderPosition());
-    m_scrollTimer->setProperty("ignoreSliderUpdate", true);
-    m_scrollTimer->setProperty("storedPosition", value());
-    int incrementToBeCovered = sliderPosition() - value();
-
-    // Nessun movimento immediato nè pianificato, il timer se ne occuperà
-    //setValue(value());
-    setSliderPosition(value());
-
-
-    int sliderIncrement = incrementToBeCovered / 15;
-    if(sliderIncrement == 0)
-        sliderIncrement = sgn(incrementToBeCovered);
-    m_scrollTimer->setProperty("sliderIncrement", sliderIncrement);
-    m_scrollTimer->setProperty("sliderValueRecorded", value());
-    //qDebug() << "scroll action detected - cur pos: " << value() << " desired pos: " << sliderPosition();
-
-    m_scrollTimer->start(50);
+    m_scrollAnim->start();
 }
 
-void CustomScrollBar::timerScroll() {
-    // L'area di scroll ha un range [0, maximum()] quindi il timer
-    // va terminato quando sfora questi limiti
-    int sliderDesiredPosition = m_scrollTimer->property("sliderDesiredPosition").toInt();
-    int sliderIncrement = m_scrollTimer->property("sliderIncrement").toInt();
-    qDebug() << "[TIMER] reaching " << sliderDesiredPosition;
-    //qDebug() << "value() " << value() << " sliderDesiredPosition " << sliderDesiredPosition << " maximum() " << maximum()
-     //        << " sliderIncrement: " << sliderIncrement;
-    if( (value() <= 0 && sliderDesiredPosition < 0) || // Slider al minimo e abbiamo chiesto fuori range
-        (value() >= maximum() && sliderDesiredPosition > maximum())) // Slider al massimo e abbiamo chiesto fuori range
-    {
-        m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
-        setSliderPosition(value());
-        qDebug() << ">TIMER FINISHED<";
-    }
-    else {
-        // Se abbiamo raggiunto il range/il valore preciso il nostro compito è finito
-        if(sliderDesiredPosition + abs(sliderIncrement) >= value() &&
-                value() >= sliderDesiredPosition - abs(sliderIncrement)) {
-            m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
-            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
-            setValue(clamp(value(), 0, maximum()));
-            m_scrollTimer->setProperty("storedPosition", value());
-            setSliderPosition(value());
-            qDebug() << ">TIMER FINISHED - range reached - <";
-        } else {
-            //qDebug() << " incrementando value a: " << value()+sliderIncrement;
-            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
-            setValue(value() + sliderIncrement);
-            m_scrollTimer->setProperty("storedPosition", value());
-            m_scrollTimer->setProperty("ignoreSliderUpdate", true);
-        }
-    }
-}
+//    //disconnect(m_parent, SIGNAL())
+
+//    // Lo slider si trova in value(), devo scrollarlo verso sliderPosition() in una serie di step
+//    // quindi mi calcolo l'incremento da applicare ad ogni step
+//    m_scrollTimer->setProperty("sliderDesiredPosition", sliderPosition());
+//    m_scrollTimer->setProperty("ignoreSliderUpdate", true);
+//    m_scrollTimer->setProperty("storedPosition", value());
+//    int incrementToBeCovered = sliderPosition() - value();
+
+//    // Nessun movimento immediato nè pianificato, il timer se ne occuperà
+//    //setValue(value());
+//    setSliderPosition(value());
+
+
+//    int sliderIncrement = incrementToBeCovered / 15;
+//    if(sliderIncrement == 0)
+//        sliderIncrement = sgn(incrementToBeCovered);
+//    m_scrollTimer->setProperty("sliderIncrement", sliderIncrement);
+//    m_scrollTimer->setProperty("sliderValueRecorded", value());
+//    //qDebug() << "scroll action detected - cur pos: " << value() << " desired pos: " << sliderPosition();
+
+//    m_scrollTimer->start(50);
+//}
+
+//void CustomScrollBar::timerScroll() {
+//    // L'area di scroll ha un range [0, maximum()] quindi il timer
+//    // va terminato quando sfora questi limiti
+//    int sliderDesiredPosition = m_scrollTimer->property("sliderDesiredPosition").toInt();
+//    int sliderIncrement = m_scrollTimer->property("sliderIncrement").toInt();
+//    qDebug() << "[TIMER] reaching " << sliderDesiredPosition;
+//    //qDebug() << "value() " << value() << " sliderDesiredPosition " << sliderDesiredPosition << " maximum() " << maximum()
+//     //        << " sliderIncrement: " << sliderIncrement;
+//    if( (value() <= 0 && sliderDesiredPosition < 0) || // Slider al minimo e abbiamo chiesto fuori range
+//        (value() >= maximum() && sliderDesiredPosition > maximum())) // Slider al massimo e abbiamo chiesto fuori range
+//    {
+//        m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
+//        setSliderPosition(value());
+//        qDebug() << ">TIMER FINISHED<";
+//    }
+//    else {
+//        // Se abbiamo raggiunto il range/il valore preciso il nostro compito è finito
+//        if(sliderDesiredPosition + abs(sliderIncrement) >= value() &&
+//                value() >= sliderDesiredPosition - abs(sliderIncrement)) {
+//            m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
+//            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
+//            setValue(clamp(value(), 0, maximum()));
+//            m_scrollTimer->setProperty("storedPosition", value());
+//            setSliderPosition(value());
+//            qDebug() << ">TIMER FINISHED - range reached - <";
+//        } else {
+//            //qDebug() << " incrementando value a: " << value()+sliderIncrement;
+//            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
+//            setValue(value() + sliderIncrement);
+//            m_scrollTimer->setProperty("storedPosition", value());
+//            m_scrollTimer->setProperty("ignoreSliderUpdate", true);
+//        }
+//    }
+//}
 
 // Quando il controllo viene resizato, si aggiorna anche il numero massimo di righe che possiamo visualizzare
 // entro la view
@@ -142,17 +177,14 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
 
 void CustomScrollBar::sliderChange ( SliderChange change ) {
 
-    if(m_scrollTimer->property("ignoreSliderUpdate").toBool()) {
 
-        return;
-    }
     /*if(m_scrollTimer->isActive()) {
         qDebug() << "sliderValueChange ricevuto ma bailing out immediatamente causa timer";
         int sliderValueRecorded = m_scrollTimer->property("sliderValueRecorded").toInt();
         setValue(sliderValueRecorded);
         return;
     }*/
-    qDebug() << "sliderValueChange ricevuto e value == " << value();
+    //qDebug() << "sliderValueChange ricevuto e value == " << value();
 
     // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
     // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il valore dello
@@ -160,10 +192,10 @@ void CustomScrollBar::sliderChange ( SliderChange change ) {
     // Non posso fare un semplice m_internalLineCount = (m_parent->document()->lineCount() - 1);
     // perchè non è sempre valido e in wrap mode crea problemi
     setMaximum( (m_internalLineCount - 1) * m_textLineHeight );
-    qDebug() << "sliderValueChange dopo setMaximum ricevuto e value == " << value();
+    //qDebug() << "sliderValueChange dopo setMaximum ricevuto e value == " << value();
     QAbstractSlider::sliderChange(change);
 
-    qDebug() << "sliderValueChange dopo base class call ricevuto e value == " << value();
+    //qDebug() << "sliderValueChange dopo base class call ricevuto e value == " << value();
 }
 
 
@@ -295,3 +327,26 @@ void CustomScrollBar::paintEvent ( QPaintEvent * event ) {
     //QScrollBar::paintEvent(event);
 }
 
+PgKeyEater::PgKeyEater ( CustomScrollBar *scrollBar ) :
+    m_scrollBar(scrollBar)
+{
+}
+
+bool PgKeyEater::eventFilter ( QObject *obj, QEvent *event ) {
+    if (event->type() == QEvent::KeyPress) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+
+        // Mangia il pageup/pagedown, verrà gestito dalla scrollbar verticale
+        if(keyEvent->key() == Qt::Key_PageUp) {
+            m_scrollBar->m_scrollAnim->setProperty("pageStepEvent", 1);
+            m_scrollBar->setSliderPosition(m_scrollBar->sliderPosition() - m_scrollBar->pageStep());
+            return true;
+        } else if (keyEvent->key() == Qt::Key_PageDown) {
+            m_scrollBar->m_scrollAnim->setProperty("pageStepEvent", 2);
+            m_scrollBar->setSliderPosition(m_scrollBar->sliderPosition() + m_scrollBar->pageStep());
+            return true;
+        }
+    }
+    // standard event processing
+    return QObject::eventFilter(obj, event);
+}

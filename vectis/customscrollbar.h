@@ -3,7 +3,8 @@
 
 #include <QScrollBar>
 #include <QTextEdit>
-#include <QTimer>
+#include <QPropertyAnimation>
+#include <memory>
 
 
 #include <QCommonStyle>
@@ -127,11 +128,30 @@ class CustomStyle : public QCommonStyle
      }
  };
 
+class CustomScrollBar;
+// Questa classe si occupa di "mangiare" gli eventi PageUp/PageDown
+// da parte del QTextEdit widget per evitare il fastidioso interrompere
+// dell'animazione da parte del caret mosso che modifica value()
+class PgKeyEater : public QObject
+{
+    Q_OBJECT
+
+    friend class CustomScrollBar;
+    explicit PgKeyEater ( CustomScrollBar *scrollBar );
+    CustomScrollBar *m_scrollBar;
+
+protected:
+    bool eventFilter ( QObject *obj, QEvent *event );
+};
+
 class CustomScrollBar : public QScrollBar
 {
     Q_OBJECT
 public:
     CustomScrollBar(QTextEdit * parent = 0);
+    ~CustomScrollBar();
+
+    friend class PgKeyEater;
 
 private:
     void paintEvent ( QPaintEvent * event );
@@ -142,16 +162,17 @@ private:
     int   m_maxNumLines;
     qreal m_textLineHeight;
     int   m_internalLineCount;
-    QTimer * m_scrollTimer;
+    //QTimer * m_scrollTimer;
+    std::unique_ptr<QPropertyAnimation> m_scrollAnim;
     bool  m_sliderIsBeingDragged;
+    std::unique_ptr<PgKeyEater> m_pgKeyEater;
 
 private slots:
     void documentSizeChanged ( const QSizeF & newSize );
     void sliderPressed ();
     void sliderReleased ();
     void actionTriggered ( int action );
-    void timerScroll ();
-    void valueChanged ( int value );
+    void moveParentCaret ();
 
 signals:
 
