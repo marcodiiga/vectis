@@ -143,12 +143,15 @@ private:
     qreal m_textLineHeight;
     int   m_internalLineCount;
     QTimer * m_scrollTimer;
-    struct scrollDv { int dx; int dy; } m_scrollDv;
+    bool  m_sliderIsBeingDragged;
 
 private slots:
-    void documentSizeChanged (const QSizeF & newSize );
-   // void scrollToValue ( int value );
-   // void timerScroll();
+    void documentSizeChanged ( const QSizeF & newSize );
+    void sliderPressed ();
+    void sliderReleased ();
+    void actionTriggered ( int action );
+    void timerScroll ();
+    void valueChanged ( int value );
 
 signals:
 

@@ -14,7 +14,8 @@ CustomScrollBar::CustomScrollBar ( QTextEdit * parent ) :
     QScrollBar(parent),
     m_parent(parent),
     m_textLineHeight(1),
-    m_internalLineCount(1)
+    m_internalLineCount(1),
+    m_sliderIsBeingDragged(false)
 {
     Q_ASSERT( parent );
 
@@ -23,37 +24,114 @@ CustomScrollBar::CustomScrollBar ( QTextEdit * parent ) :
 
     connect(m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
             this, SLOT(documentSizeChanged(const QSizeF&)));
-    //m_scrollTimer = new QTimer(this);
-    //connect(m_scrollTimer, SIGNAL(timeout()), this, SLOT(timerScroll()));
+    connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
+    connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
+    connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
+    m_scrollTimer = new QTimer(this);
+    connect(m_scrollTimer, SIGNAL(timeout()), this, SLOT(timerScroll()));
     //connect(this, SIGNAL(valueChanged(int)), this, SLOT(scrollToValue(int)));
+
+
 }
 
-/*
-void CustomScrollBar::scrollToValue ( int value ) {
-    qDebug() << "scrollToValue starting.. from " << this->value() << " to " << value;
-    m_scrollTimer->setProperty("valueToReach", value);
-    m_scrollTimer->start(1000);
+namespace {
+    // Un piccolo template per ritornare -1 o 1 a seconda del segno di un valore
+    template <typename T> int sgn(T val) {
+        return (T(0) < val) - (val < T(0));
+    }
+    // Restituisce il clamped value di un intero
+    int clamp(int val, int min, int max) {
+        if(val < min)
+            return min;
+        if(val > max)
+            return max;
+        return val;
+    }
+}
+
+// This happens when the slider is being dragged by the user
+void CustomScrollBar::sliderReleased () {
+    m_sliderIsBeingDragged = false;
+}
+void CustomScrollBar::sliderPressed () {
+    m_sliderIsBeingDragged = true;
+}
+
+
+
+// This happens whenever the slider is moved (mouse scrollbar / page down-up / dragging)
+void CustomScrollBar::actionTriggered ( int action ) {
+    qDebug() << "actionTriggered received action << " << action << " m_sliderIsBeingDragged = " << m_sliderIsBeingDragged <<
+                ", al momento del segnale value mi risulta: " << value();
+    if(action == QAbstractSlider::SliderNoAction || m_sliderIsBeingDragged)
+        return;
+
+    //disconnect(m_parent, SIGNAL())
+
+    // Lo slider si trova in value(), devo scrollarlo verso sliderPosition() in una serie di step
+    // quindi mi calcolo l'incremento da applicare ad ogni step
+    m_scrollTimer->setProperty("sliderDesiredPosition", sliderPosition());
+    m_scrollTimer->setProperty("ignoreSliderUpdate", true);
+    m_scrollTimer->setProperty("storedPosition", value());
+    int incrementToBeCovered = sliderPosition() - value();
+
+    // Nessun movimento immediato nè pianificato, il timer se ne occuperà
+    //setValue(value());
+    setSliderPosition(value());
+
+
+    int sliderIncrement = incrementToBeCovered / 15;
+    if(sliderIncrement == 0)
+        sliderIncrement = sgn(incrementToBeCovered);
+    m_scrollTimer->setProperty("sliderIncrement", sliderIncrement);
+    m_scrollTimer->setProperty("sliderValueRecorded", value());
+    //qDebug() << "scroll action detected - cur pos: " << value() << " desired pos: " << sliderPosition();
+
+    m_scrollTimer->start(50);
 }
 
 void CustomScrollBar::timerScroll() {
-    int valueToReach = *static_cast<const int*>(m_scrollTimer->property("valueToReach").constData());
-    qDebug() << "[TIMER] reaching " << valueToReach;
-    if(value() == valueToReach)
+    // L'area di scroll ha un range [0, maximum()] quindi il timer
+    // va terminato quando sfora questi limiti
+    int sliderDesiredPosition = m_scrollTimer->property("sliderDesiredPosition").toInt();
+    int sliderIncrement = m_scrollTimer->property("sliderIncrement").toInt();
+    qDebug() << "[TIMER] reaching " << sliderDesiredPosition;
+    //qDebug() << "value() " << value() << " sliderDesiredPosition " << sliderDesiredPosition << " maximum() " << maximum()
+     //        << " sliderIncrement: " << sliderIncrement;
+    if( (value() <= 0 && sliderDesiredPosition < 0) || // Slider al minimo e abbiamo chiesto fuori range
+        (value() >= maximum() && sliderDesiredPosition > maximum())) // Slider al massimo e abbiamo chiesto fuori range
+    {
         m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
+        setSliderPosition(value());
+        qDebug() << ">TIMER FINISHED<";
+    }
     else {
-        if(value() < valueToReach)
-            setValue(value() + 1);
-        else
-            setValue(value() - 1);
+        // Se abbiamo raggiunto il range/il valore preciso il nostro compito è finito
+        if(sliderDesiredPosition + abs(sliderIncrement) >= value() &&
+                value() >= sliderDesiredPosition - abs(sliderIncrement)) {
+            m_scrollTimer->stop(); // Abbiamo raggiunto il punto che volevamo
+            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
+            setValue(clamp(value(), 0, maximum()));
+            m_scrollTimer->setProperty("storedPosition", value());
+            setSliderPosition(value());
+            qDebug() << ">TIMER FINISHED - range reached - <";
+        } else {
+            //qDebug() << " incrementando value a: " << value()+sliderIncrement;
+            m_scrollTimer->setProperty("ignoreSliderUpdate", false);
+            setValue(value() + sliderIncrement);
+            m_scrollTimer->setProperty("storedPosition", value());
+            m_scrollTimer->setProperty("ignoreSliderUpdate", true);
+        }
     }
 }
-*/
+
 // Quando il controllo viene resizato, si aggiorna anche il numero massimo di righe che possiamo visualizzare
 // entro la view
 void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
    qDebug() << "TODO: resizeEvent per la ScrollBar, è utile il setMaximum qua? Se basta il docSizeChange rimuovilo";
    // setMaximum( m_internalLineCount * m_textLineHeight );
     //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
+
 
     //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
 
@@ -64,16 +142,28 @@ void CustomScrollBar::resizeEvent ( QResizeEvent * event ) {
 
 void CustomScrollBar::sliderChange ( SliderChange change ) {
 
+    if(m_scrollTimer->property("ignoreSliderUpdate").toBool()) {
+
+        return;
+    }
+    /*if(m_scrollTimer->isActive()) {
+        qDebug() << "sliderValueChange ricevuto ma bailing out immediatamente causa timer";
+        int sliderValueRecorded = m_scrollTimer->property("sliderValueRecorded").toInt();
+        setValue(sliderValueRecorded);
+        return;
+    }*/
+    qDebug() << "sliderValueChange ricevuto e value == " << value();
+
     // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
     // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il valore dello
     // slider (e.g. sto scrollando o aggiungo/tolgo righe oppure wrappo) e aumentare il massimo dove si può scrollare.
     // Non posso fare un semplice m_internalLineCount = (m_parent->document()->lineCount() - 1);
     // perchè non è sempre valido e in wrap mode crea problemi
     setMaximum( (m_internalLineCount - 1) * m_textLineHeight );
-
-    //qDebug() << "sliderChange: maximum aggiornato a: " << maximum();
-
+    qDebug() << "sliderValueChange dopo setMaximum ricevuto e value == " << value();
     QAbstractSlider::sliderChange(change);
+
+    qDebug() << "sliderValueChange dopo base class call ricevuto e value == " << value();
 }
 
 

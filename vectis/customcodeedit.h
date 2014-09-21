@@ -3,6 +3,7 @@
 
 #include <QTextEdit>
 #include <QTimer>
+#include <memory>
 
 class CustomCodeEdit : public QTextEdit
 {
@@ -12,8 +13,10 @@ public:
 
 private:
     void scrollContentsBy ( int dx, int dy ) override;
+    std::unique_ptr<QTimer> m_scrollTimer;
 
 private slots:
+    void timerScroll();
 
 signals:
 
