@@ -14,12 +14,12 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         vmainwindow.cpp \
-    customscrollbar.cpp \
-    customcodeedit.cpp
+    UI/CodeTextEdit/CodeTextEdit.cpp \
+    UI/ScrollBar/ScrollBar.cpp
 
 HEADERS  += vmainwindow.h \
-    customscrollbar.h \
-    customcodeedit.h
+    UI/CodeTextEdit/CodeTextEdit.h \
+    UI/ScrollBar/ScrollBar.h
 
 FORMS    += vmainwindow.ui
 

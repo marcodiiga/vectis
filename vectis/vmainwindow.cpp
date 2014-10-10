@@ -22,7 +22,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     // Crea il controllo code editor
-    m_customCodeEdit = new CustomCodeEdit(this);
+    m_customCodeEdit = new CodeTextEdit(this);
     m_customCodeEdit->setGeometry(10,20,740,400);
     ui->verticalLayout->addWidget(m_customCodeEdit);
 
@@ -68,7 +68,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
                     width: 4px;\
                 }\
                 "));*/
-    m_customCodeEdit->setVerticalScrollBar(new CustomScrollBar(m_customCodeEdit));
+    m_customCodeEdit->setVerticalScrollBar(new ScrollBar(m_customCodeEdit));
     m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
                                                                   QScrollBar:vertical {\
                                                                     width:15px;\
