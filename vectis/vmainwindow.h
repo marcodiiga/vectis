@@ -1,10 +1,12 @@
 #ifndef VMAINWINDOW_H
 #define VMAINWINDOW_H
 
-#include <QDialog>
-#include <QPixmap>
 #include <UI/CodeTextEdit/CodeTextEdit.h>
 #include <UI/ScrollBar/ScrollBar.h>
+#include <UI/TabsBar/TabsBar.h>
+#include <QDialog>
+#include <QPixmap>
+#include <memory>
 
 namespace Ui {
 class VMainWindow;
@@ -26,7 +28,9 @@ private slots:
 
 private:
     Ui::VMainWindow *ui;
-    CodeTextEdit *m_customCodeEdit;
+    std::unique_ptr<CodeTextEdit> m_customCodeEdit;
+    std::unique_ptr<ScrollBar>    m_verticalScrollBar;
+    std::unique_ptr<TabsBar>      m_tabsBar;
 };
 
 #endif // VMAINWINDOW_H

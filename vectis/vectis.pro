@@ -16,11 +16,13 @@ INCLUDEPATH += $$PWD
 SOURCES += main.cpp\
         vmainwindow.cpp \
     UI/CodeTextEdit/CodeTextEdit.cpp \
-    UI/ScrollBar/ScrollBar.cpp
+    UI/ScrollBar/ScrollBar.cpp \
+    UI/TabsBar/TabsBar.cpp
 
 HEADERS  += vmainwindow.h \
     UI/CodeTextEdit/CodeTextEdit.h \
-    UI/ScrollBar/ScrollBar.h
+    UI/ScrollBar/ScrollBar.h \
+    UI/TabsBar/TabsBar.h
 
 FORMS    += vmainwindow.ui
 

@@ -22,9 +22,9 @@ VMainWindow::VMainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     // Crea il controllo code editor
-    m_customCodeEdit = new CodeTextEdit(this);
+    m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
     m_customCodeEdit->setGeometry(10,20,740,400);
-    ui->verticalLayout->addWidget(m_customCodeEdit);
+    ui->codeTextEdit->addWidget(m_customCodeEdit.get());
 
     // Set background color for the edit code control
     m_customCodeEdit->setStyleSheet("QTextEdit {                                        \
@@ -33,8 +33,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                      border: 0px;                                       \
                                      font-size: 14px;                                   \
                                      }");
-    // Consolas è installato di default su tutti i sistemi Windows, ma non linux
-    // il matching engine di Qt tenterà di trovare Consolas o un monospace di rimpiazzo
+    // Consolas è installato di default su tutti i sistemi Windows, ma non linux.
+    // Il matching engine di Qt tenterà di trovare Consolas o un monospace di rimpiazzo
     // font-family: Consolas, monospace;
     QFont font("Consolas");
     font.setStyleHint(QFont::Monospace);
@@ -68,12 +68,15 @@ VMainWindow::VMainWindow(QWidget *parent) :
                     width: 4px;\
                 }\
                 "));*/
-    m_customCodeEdit->setVerticalScrollBar(new ScrollBar(m_customCodeEdit));
+    m_verticalScrollBar = std::make_unique<ScrollBar>(m_customCodeEdit.get());
+    m_customCodeEdit->setVerticalScrollBar(m_verticalScrollBar.get());
     m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
                                                                   QScrollBar:vertical {\
                                                                     width:15px;\
                                                                   }"));
 
+    // Crea la TabsBar
+    m_tabsBar = std::make_unique<TabsBar>();
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
@@ -84,6 +87,5 @@ void VMainWindow::paintEvent(QPaintEvent *)
 }
 
 VMainWindow::~VMainWindow() {
-    delete m_customCodeEdit;
     delete ui;
 }
