@@ -11,6 +11,7 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = vectis
 TEMPLATE = app
 
+INCLUDEPATH += $$PWD
 
 SOURCES += main.cpp\
         vmainwindow.cpp \
@@ -23,4 +24,4 @@ HEADERS  += vmainwindow.h \
 
 FORMS    += vmainwindow.ui
 
-QMAKE_CXXFLAGS += -std=c++11
+#QMAKE_CXXFLAGS += -std=c++11
