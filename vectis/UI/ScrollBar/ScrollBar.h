@@ -23,7 +23,7 @@ protected:
 class ScrollBar : public QScrollBar {
     Q_OBJECT
 public:
-    ScrollBar( QTextEdit * parent = 0 );
+    explicit ScrollBar( QTextEdit * parent = 0 );
     ~ScrollBar();
 
 private:
@@ -31,7 +31,7 @@ private:
     void resizeEvent ( QResizeEvent * event );
     void sliderChange ( SliderChange change );
 
-    QTextEdit * m_parent;
+    QTextEdit *m_parent;
     int   m_maxViewVisibleLines; // Le righe che la view corrente del controllo testo può visualizzare
     qreal m_textLineHeight;
     int   m_internalLineCount; // Le righe reali del controllo testo (non è moltiplicato per lineHeight)

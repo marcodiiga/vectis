@@ -4,6 +4,7 @@
 #include <QScrollArea>
 #include <QLayout>
 
+#include <QDebug>
 
 VMainWindow::VMainWindow(QWidget *parent) :
     QDialog(parent),
@@ -17,15 +18,15 @@ VMainWindow::VMainWindow(QWidget *parent) :
     this->setWindowFlags(flags);
     // Set the background color for window. Notice: style sheets are
     // more portable than modifying the palette directly
-    /*this->setStyleSheet("QDialog { background-color: #272822; }"); */
+    /* this->setStyleSheet("QDialog { background-color: #272822; }"); */
 
     ui->setupUi(this);
 
     // Crea il controllo code editor
     m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
-    m_customCodeEdit->setGeometry(10,20,740,400);
-    ui->codeTextEdit->addWidget(m_customCodeEdit.get());
+    ui->codeTextEditArea->addWidget(m_customCodeEdit.get());
 
+    qWarning() << "TODO: muovi lo stylesheet e il font setting DENTRO il controllo, non qui!";
     // Set background color for the edit code control
     m_customCodeEdit->setStyleSheet("QTextEdit {                                        \
                                      background-color: #272822;                         \
@@ -76,7 +77,12 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                                                   }"));
 
     // Crea la TabsBar
-    m_tabsBar = std::make_unique<TabsBar>();
+    m_tabsBar = std::make_unique<TabsBar>(this);
+    //m_tabsBar->addTab("cazzo tab di prova");
+    //m_tabsBar->addTab("seconda tab");
+    ui->tabsBarArea->addWidget(m_tabsBar.get());
+
+
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
