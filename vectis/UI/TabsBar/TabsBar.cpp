@@ -12,7 +12,7 @@ TabsBar::TabsBar( QWidget *parent )
 
     // WA_OpaquePaintEvent specifica che ridisegneremo il controllo ogni volta che ce n'è bisogno
     // senza intervento del sistema.
-    //setAttribute( Qt::WA_OpaquePaintEvent, false );
+    setAttribute( Qt::WA_OpaquePaintEvent, false );
     //qInstallMessageHandler(crashMessageOutput);
     setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
 }
@@ -32,7 +32,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     const QColor outerBlackCol(11, 11, 10);
     const QColor innerGrayCol(60, 61, 56);
 
-    // La tab attualmente selezionata (può essere nulla)
+    // La tab attualmente selezionata (TODO: può essere nulla)
     QRect selectedTabRect(5, 5, 150 /* Width */, rect().bottom() - 5);
 
     // Disegna la barra orizzontale in basso che si collega al CodeTextEdit;
@@ -46,7 +46,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     p.drawLine( selectedTabRect.right(), rect().bottom() - 1, rect().right(), rect().bottom() - 1);
 
     p.setPen(QColor(255,0,0)); // Debug
-    //p.drawRect(tabRect); // Debug
+    //p.drawRect(selectedTabRect); // Debug
 
     // Disegna due curve di bezièr e una linea orizzontale per la tab
     //  _______________
@@ -57,27 +57,38 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     // |___/____c1_____|
     // 0;h              h;h
     QPainterPath tabPath;
-    const QPointF c1(0.63f, -0.04f), c2(0.52f, 0.97f);
+    const QPointF c1(0.52f, 0.97f), c2(0.63f, -0.04f);
     const int h = selectedTabRect.height();
     tabPath.moveTo(selectedTabRect.x(), selectedTabRect.y() + selectedTabRect.height() + 1); // QRect ha bordi di 1 px, compenso
-    tabPath.cubicTo(selectedTabRect.x() + h * c2.x(), selectedTabRect.y() + h * c2.y(),
-                 selectedTabRect.x() + h * c1.x(), selectedTabRect.y() + h * c1.y(),
+    qDebug() << selectedTabRect.x() << " " << selectedTabRect.y() + selectedTabRect.height() + 1;
+    tabPath.cubicTo(selectedTabRect.x() + h * c1.x(), selectedTabRect.y() + h * c1.y(),
+                 selectedTabRect.x() + h * c2.x(), selectedTabRect.y() + h * c2.y(),
                  selectedTabRect.x() + h, selectedTabRect.y()); // Destination point
+    qDebug() << selectedTabRect.x() + h << " " << selectedTabRect.y();
 
-    int dxStartBez = selectedTabRect.x() + selectedTabRect.width() - h - 2;
-    tabPath.lineTo(dxStartBez - 1, selectedTabRect.y()); // Larghezza della tab
+    int dxStartBez = selectedTabRect.x() + selectedTabRect.width() - h;
+    tabPath.lineTo(dxStartBez, selectedTabRect.y()); // Larghezza della tab
 
     // Disegna la bezièr dx
-    tabPath.cubicTo(dxStartBez + h * c1.x(), selectedTabRect.y() + h * c1.y(),
-                    dxStartBez + h * c2.x(), selectedTabRect.y() + h * c2.y(),
-                    selectedTabRect.x() + selectedTabRect.width() + 1, selectedTabRect.y() + selectedTabRect.height() + 1);
+    tabPath.cubicTo(dxStartBez + (h - h * c2.x()), selectedTabRect.y() + h * c2.y(),
+                    dxStartBez + (h - h * c1.x()), selectedTabRect.y() + h * c1.y(),
+                    selectedTabRect.x() + selectedTabRect.width(), selectedTabRect.y() + selectedTabRect.height() + 1);
 
+    // Riempie la tabPath con un gradiente di sfondo
+    QLinearGradient selectedTabGradient( selectedTabRect.topLeft(), selectedTabRect.bottomLeft() ); // Direzione verticale
+    selectedTabGradient.setColorAt( 1, QColor(39, 40, 34) ); // Colore finale è lo sfondo della code text box
+    selectedTabGradient.setColorAt( 0, QColor(52, 53, 47) ); // Colore iniziale (in alto) è più chiaro
+    QBrush selectedTabBrushFill( selectedTabGradient );
+    p.setBrush( selectedTabBrushFill );
+    p.fillPath( tabPath, selectedTabBrushFill );
 
-
+    // Una volta riempito (fillato) lo sfondo, si può disegnare sopra un bordo grigio ed
+    // una path attaccata alla prima come un bordo nero traslata di 2 in alto
+    QPainterPath blackOuterTabPath = tabPath.translated(0, -2);
+    p.setPen(blackPen);
+    p.drawPath(blackOuterTabPath);
     p.setPen(grayPen);
     p.drawPath(tabPath);
-    tabPath.translate(0, -2);
-    p.setPen(blackPen);
-    p.drawPath(tabPath);
-    // usa QPainterPath::intersects per mouse hit test
+
+    // TODO: usa QPainterPath::intersects per mouse hit test
 }

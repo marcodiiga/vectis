@@ -32,7 +32,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                      background-color: #272822;                         \
                                      color: white;                                      \
                                      border: 0px;                                       \
-                                     font-size: 14px;                                   \
+                                     font-size: 12px;                                   \
                                      }");
     // Consolas è installato di default su tutti i sistemi Windows, ma non linux.
     // Il matching engine di Qt tenterà di trovare Consolas o un monospace di rimpiazzo
