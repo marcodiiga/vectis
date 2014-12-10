@@ -2,7 +2,9 @@
 #define TABSBAR_H
 
 #include <QWidget>
-#include <memory>
+
+#define TAB_MAXIMUM_WIDTH 150
+#define TAB_INTERSECTION_DELTA 20
 
 class Tab { // Questa classe rappresenta una tab del controllo
 public:
@@ -21,8 +23,8 @@ private:
     void paintEvent ( QPaintEvent* );
 
     QWidget *m_parent;
-    std::list<std::unique_ptr<Tab>> m_tabs; // Il vettore delle tabs
-    size_t m_selectedTabIndex; // L'index della tab selezionata. -1 significa "nessuna"
+    std::list<Tab> m_tabs; // Il vettore delle tabs
+    int m_selectedTabIndex; // L'index della tab selezionata. -1 significa "nessuna"
 };
 
 #endif // TABSBAR_H

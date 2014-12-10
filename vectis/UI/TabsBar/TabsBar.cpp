@@ -19,7 +19,14 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
     //DEBUG
     // cazzeggia qui per provare le tab
-    m_tabs.push_back(std::make_unique<Tab>());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_tabs.push_back(Tab());
+    m_selectedTabIndex = m_tabs.size();
     //DEBUG
 }
 
@@ -132,16 +139,64 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     p.setPen(grayPen);
     p.drawLine(rect().left(), rect().bottom(), rect().right(), rect().bottom());
 
-    // TODO: DISEGNA QUI LE TAB -NON- SELEZIONATE, POI DISEGNA SOPRA LA LINEA ORIZZONTALE E INFINE QUELLA SELEZIONATA
+    // Disegna le tab secondo un preciso ordine:
+    // -> prima quelle NON selezionate a destra e a sinistra della selezionata, partendo da quella più vicina
+    // alla selezionata per poi andare verso le esterne
+    // -> poi le linee orizzontali (che vanno sopra alle non selezionate)
+    // -> poi alla fine la selezionata
 
+    // Calcola la dimensione di una tab a seconda della larghezza del controllo e di quante
+    // ce ne sono da disegnare
+    //
+    //                   3w
+    // |--------------------------------------| Se il controllo ha dimensione massima 3w (rect().width()-(bordi_vari)),
+    // |     w      |     w      |     w      | ed ho 3 tab, la dimensione massima è w per ciascuna. Dato che però le tab
+    // |            |            |            | non sono tenute esattamente una di seguito all'altra ma c'è un "intersection
+    // |--------------------------------------| delta" fra di loro, cioè un'area nella quale queste tab si intersecano, allora
+    // è necessario considerare che si lascia uno spazio inutilizzato alla fine proporzionalmente a quante tab ci sono:
+    //                                                                          |-----------------------------------------|
+    // Nel caso qui a destra si lascia uno spazio di 2d. Questo spazio deve     |         | d |        | d |        |
+    // essere ridistribuito alle varie tab, quindi                              ---------------
+    //                  tabWidth = 3w / 3                                                 ------------------
+    //                  tabWidth += (3w - (3-1)*d)/3                                                   --------------  2d
+    //                                                                                                               ------
+    int tabWidth = (rect().width() - (5+20 /* bordo sx 5 px, bordo dx 20 px */)) / (int)m_tabs.size();
+    int tabHeight = rect().bottom() - 5;
+    tabWidth += (TAB_INTERSECTION_DELTA * (int)(m_tabs.size()-1)) / (int)m_tabs.size();
+    // Clamping del risultato ai valori max e min
+    if(tabWidth > TAB_MAXIMUM_WIDTH)
+        tabWidth = TAB_MAXIMUM_WIDTH;
+    if(tabWidth < 2*tabHeight) // Almeno lo spazio per disegnare le curve di bezièr
+        tabWidth = 2*tabHeight;
+    QRect standardTabRect(5, 5, tabWidth /* Width */, tabHeight);
+
+    // Disegna prima le tab a sx della selezionata (se ci sono)
+    {
+        QPainterPath temp;
+        for(int i = m_selectedTabIndex - 1; i >= 0; --i) {
+            int x = 5 + i*tabWidth;
+            x -= TAB_INTERSECTION_DELTA*i;
+            standardTabRect.setX(x);
+            standardTabRect.setWidth(tabWidth);
+            qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
+                        standardTabRect.width() << "," << standardTabRect.height();
+
+            if(i == m_selectedTabIndex - 1)
+                temp = drawTabInsideRect(p, standardTabRect, false);
+            else
+                temp = drawTabInsideRect(p, standardTabRect, false, &temp);
+            //p.setPen(QColor(255 - i*20,0,0));
+            //p.drawRect(standardTabRect);
+        }
+    }
     // DEBUG - La tab attualmente selezionata (TODO: può essere nulla)
-    QRect unSelectedTabRect(5, 5, 150 /* Width */, rect().bottom() - 5);
+    //QRect unSelectedTabRect(5, 5, 150 /* Width */, rect().bottom() - 5);
 
-    QPainterPath tab = drawTabInsideRect(p, unSelectedTabRect, false);
+    //QPainterPath tab = drawTabInsideRect(p, unSelectedTabRect, false);
 
-    QRect selectedTabRect(5+unSelectedTabRect.width() - 20, 5, 150 /* Width */, rect().bottom() - 5);
+    //QRect selectedTabRect(5+unSelectedTabRect.width() - 20, 5, 150 /* Width */, rect().bottom() - 5);
 
-    drawTabInsideRect(p, selectedTabRect, true, &tab, 0);
+    //drawTabInsideRect(p, selectedTabRect, true, &tab, 0);
 
     //p.setPen(QColor(255,0,0)); // Debug bordo tab
     //p.drawRect(selectedTabRect); // Debug bordo tab
