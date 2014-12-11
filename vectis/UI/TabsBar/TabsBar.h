@@ -16,8 +16,9 @@ class TabsBar : public QWidget { // Questa classe rappresenta l'intero controllo
     Q_OBJECT
 public:
     explicit TabsBar( QWidget *parent = 0 );
-    QPainterPath drawTabInsideRect(QPainter& p, QRect& tabRect , bool selected ,
+    QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected ,
                                    const QPainterPath* sxTabRect = 0, const QPainterPath* dxTabRect = 0);
+    void drawGrayHorizontalBar( QPainter& p, const QColor innerGrayCol );
 private:
 
     void paintEvent ( QPaintEvent* );

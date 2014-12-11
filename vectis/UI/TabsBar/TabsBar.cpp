@@ -26,12 +26,13 @@ TabsBar::TabsBar( QWidget *parent )
     m_tabs.push_back(Tab());
     m_tabs.push_back(Tab());
     m_tabs.push_back(Tab());
-    m_selectedTabIndex = m_tabs.size();
+    m_selectedTabIndex = 4;
     //DEBUG
 }
 
-// Disegna una tab selezionata o meno dentro un rect
-QPainterPath TabsBar::drawTabInsideRect( QPainter& p, QRect& tabRect, bool selected,
+// Disegna una tab selezionata o meno dentro un rect. Se si conoscono tab a destra e sinistra, consente di
+// migliorarne l'aspetto inserendo una sfumatura
+QPainterPath TabsBar::drawTabInsideRect( QPainter& p, const QRect& tabRect, bool selected,
                                          const QPainterPath* sxTabRect, const QPainterPath* dxTabRect ) {
     // Decide i colori per una tab selected o unselected
     QColor topGradientColor, bottomGradientColor;
@@ -78,72 +79,71 @@ QPainterPath TabsBar::drawTabInsideRect( QPainter& p, QRect& tabRect, bool selec
     p.fillPath( tabPath, tabBrushFill );
 
     p.setRenderHint(QPainter::SmoothPixmapTransform);
-
     // Una volta riempito (fillato) lo sfondo, si può disegnare sopra un bordo grigio ed
     // una path attaccata alla prima come un bordo nero traslata di 1 in alto
-    const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(56,56,53) );
+    const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(70,70,67) );
     QPainterPath blackOuterTabPath = tabPath.translated(0, -1);
-    QPainterPath bottomLine; // Evita che il contorno abbia imperfezioni
-    bottomLine.moveTo(blackOuterTabPath.boundingRect().left(), blackOuterTabPath.boundingRect().bottom()-1);
-    blackOuterTabPath.lineTo(blackOuterTabPath.boundingRect().right(), blackOuterTabPath.boundingRect().bottom()-1);
-    blackOuterTabPath.subtracted(blackOuterTabPath);
-    p.setPen(blackPen);
-    p.drawPath(blackOuterTabPath);
+    p.setPen( blackPen );
+    p.drawPath( blackOuterTabPath );
+
+    // Il bordo nero esterno va sfumato se ci sono delle tab di sfondo, altrimenti c'è uno stacco troppo netto
+    p.setRenderHint( QPainter::Antialiasing, false );
+    p.setRenderHint( QPainter::HighQualityAntialiasing, false );
     if( sxTabRect != 0 ) {
-        QPainterPath sxRemnant = blackOuterTabPath.intersected(*sxTabRect);
-        p.setPen(intersectionPen);
-        p.drawPath(sxRemnant);
+        QPainterPath sxRemnant = blackOuterTabPath.intersected( *sxTabRect );
+        p.setPen( intersectionPen );
+        p.drawPath( sxRemnant );
     }
     if( dxTabRect != 0 ) {
-        QPainterPath dxRemnant = blackOuterTabPath.intersected(*dxTabRect);
-        p.setPen(intersectionPen);
-        p.drawPath(dxRemnant);
+        QPainterPath dxRemnant = blackOuterTabPath.intersected( *dxTabRect );
+        p.setPen( intersectionPen );
+        p.drawPath( dxRemnant );
     }
-    p.setPen(grayPen);
-    p.drawPath(tabPath);
+    p.setPen( grayPen );
+    p.drawPath( tabPath );
 
-    if(selected == false) { // Le tab unselected hanno una leggera ulteriore sfumatura in basso
-        p.setRenderHint(QPainter::Antialiasing, false);
-        p.setRenderHint(QPainter::HighQualityAntialiasing, false);
-        p.setPen(QPen(QColor(60,61,56)));
-        p.drawLine(tabRect.left() + tabRect.height() / 4, tabRect.bottom(),
-                   tabRect.right() - tabRect.height() / 4, tabRect.bottom());
+    if(selected == false) { // Le tab unselected hanno una ulteriore leggera sfumatura in basso
+        p.setPen( QPen( QColor( 60,61,56 ) ) );
+        p.drawLine( tabRect.left() + tabRect.height() / 4, tabRect.bottom(),
+                    tabRect.right() - tabRect.height() / 4, tabRect.bottom() );
     }
-    return tabPath;
+    return tabPath; // Questo servirà per sfumare i bordi della selected, in caso questa tab sia ad essa vicina
+}
+
+// Disegna una barra orizzontale di separazione per il controllo
+void TabsBar::drawGrayHorizontalBar( QPainter& p , const QColor innerGrayCol ) {
+    p.setRenderHint( QPainter::Antialiasing, false );
+    p.setRenderHint( QPainter::HighQualityAntialiasing, false );
+
+    // Disegna la barra orizzontale in basso che si collega al CodeTextEdit;
+    // questa corre per tutto il code editor *tranne* che per la selected tab
+    const QPen grayPen( innerGrayCol );
+    p.setPen( grayPen );
+    p.drawLine( rect().left(), rect().bottom(), rect().right(), rect().bottom() );
 }
 
 void TabsBar::paintEvent ( QPaintEvent* ) {
+    Q_ASSERT( m_selectedTabIndex == -1 || // Nulla è selezionato, oppure siamo entro i limiti del numero di tab
+              ( m_selectedTabIndex != -1 && m_selectedTabIndex < m_tabs.size() ) );
+
     QStyleOption opt; // Permette il setting del background via styleSheet
     opt.init(this);
     QPainter p(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
 
+    const QColor innerGrayCol( 60, 61, 56 );
 
-    // La barra orizzontale che si interrompe solo sulla tab selezionata corrente, è di due pixel
-    // e ha due colori:
-    //
-    //  -- nero rgb(11,11,10)   -- bcol1
-    //  -- grigio rgb(60,61,56) -- gcol2
-    const QColor outerBlackCol(11, 11, 10);
-    const QColor innerGrayCol(60, 61, 56);
-
-    p.setRenderHint(QPainter::Antialiasing, false);
-    p.setRenderHint(QPainter::HighQualityAntialiasing, false);
-
-    // Disegna la prima barra orizzontale in basso che si collega al CodeTextEdit;
-    // questa corre per tutto il code editor *tranne* che per la selected tab
-    const QPen grayPen( innerGrayCol ), blackPen( outerBlackCol );
-    p.setPen(blackPen);
-    p.drawLine( rect().left(), rect().bottom() - 1, rect().right(), rect().bottom() - 1);
-    // e disegna anche la seconda barra grigia orizzontale
-    p.setPen(grayPen);
-    p.drawLine(rect().left(), rect().bottom(), rect().right(), rect().bottom());
+    if( m_selectedTabIndex == -1 ) {
+        drawGrayHorizontalBar( p, innerGrayCol );
+        return; // Nient'altro dev'essere disegnato
+    }
 
     // Disegna le tab secondo un preciso ordine:
     // -> prima quelle NON selezionate a destra e a sinistra della selezionata, partendo da quella più vicina
     // alla selezionata per poi andare verso le esterne
-    // -> poi le linee orizzontali (che vanno sopra alle non selezionate)
-    // -> poi alla fine la selezionata
+    // -> poi la linea grigia orizzontale, sarà visibile dove NON ci sono tab
+    // -> poi alla fine la selezionata (che va sopra a tutto)
+    //
 
     // Calcola la dimensione di una tab a seconda della larghezza del controllo e di quante
     // ce ne sono da disegnare
@@ -160,49 +160,66 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     //                  tabWidth = 3w / 3                                                 ------------------
     //                  tabWidth += (3w - (3-1)*d)/3                                                   --------------  2d
     //                                                                                                               ------
-    int tabWidth = (rect().width() - (5+20 /* bordo sx 5 px, bordo dx 20 px */)) / (int)m_tabs.size();
+    int tabWidth = ( rect().width() - (5 + 20 /* bordo sx 5 px, bordo dx 20 px */) ) / (int)m_tabs.size();
     int tabHeight = rect().bottom() - 5;
-    tabWidth += (TAB_INTERSECTION_DELTA * (int)(m_tabs.size()-1)) / (int)m_tabs.size();
+    tabWidth += ( TAB_INTERSECTION_DELTA * (int)(m_tabs.size() - 1) ) / (int)m_tabs.size();
     // Clamping del risultato ai valori max e min
-    if(tabWidth > TAB_MAXIMUM_WIDTH)
+    if( tabWidth > TAB_MAXIMUM_WIDTH )
         tabWidth = TAB_MAXIMUM_WIDTH;
-    if(tabWidth < 2*tabHeight) // Almeno lo spazio per disegnare le curve di bezièr
-        tabWidth = 2*tabHeight;
-    QRect standardTabRect(5, 5, tabWidth /* Width */, tabHeight);
+    if( tabWidth < 2 * tabHeight ) // Almeno lo spazio per disegnare le curve di bezièr
+        tabWidth = 2 * tabHeight;
+    QRect standardTabRect( 5, 5, tabWidth /* Width */, tabHeight );
 
-    // Disegna prima le tab a sx della selezionata (se ci sono)
-    {
-        QPainterPath temp;
-        for(int i = m_selectedTabIndex - 1; i >= 0; --i) {
-            int x = 5 + i*tabWidth;
-            x -= TAB_INTERSECTION_DELTA*i;
-            standardTabRect.setX(x);
-            standardTabRect.setWidth(tabWidth);
-            qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
-                        standardTabRect.width() << "," << standardTabRect.height();
+    if( m_selectedTabIndex != -1 ) {
+        // Disegna prima le tab a sx della selezionata (se ci sono)
+        QPainterPath temp, leftOfSelected, rightOfSelected;
+        for( int i = m_selectedTabIndex - 1; i >= 0; --i ) {
+            int x = 5 + i * tabWidth;
+            x -= TAB_INTERSECTION_DELTA * i;
+            standardTabRect.setX( x );
+            standardTabRect.setWidth( tabWidth );
+            //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
+            //            standardTabRect.width() << "," << standardTabRect.height();
 
-            if(i == m_selectedTabIndex - 1)
-                temp = drawTabInsideRect(p, standardTabRect, false);
+            if(i == m_selectedTabIndex - 1) { // La prima non ha bisogno di "overlapping" con nessuna
+                temp = drawTabInsideRect( p, standardTabRect, false );
+                leftOfSelected = temp;
+            }
             else
-                temp = drawTabInsideRect(p, standardTabRect, false, &temp);
+                temp = drawTabInsideRect( p, standardTabRect, false, &temp );
             //p.setPen(QColor(255 - i*20,0,0));
             //p.drawRect(standardTabRect);
         }
+        // Disegna le tab a dx della selezionata (se ci sono)
+        for( int i = (int)m_tabs.size()-1; i > m_selectedTabIndex; --i ) {
+            int x = 5 + i * tabWidth;
+            x -= TAB_INTERSECTION_DELTA * i;
+            standardTabRect.setX( x );
+            standardTabRect.setWidth( tabWidth );
+            //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
+            //            standardTabRect.width() << "," << standardTabRect.height();
+
+            if(i == m_tabs.size()-1) // La prima non ha bisogno di "overlapping" con nessuna
+                temp = drawTabInsideRect( p, standardTabRect, false );
+            else
+                temp = drawTabInsideRect( p, standardTabRect, false, &temp );
+            if( i == m_selectedTabIndex+1 )
+                rightOfSelected = temp;
+            //p.setPen(QColor(255 - i*20,0,0));
+            //p.drawRect(standardTabRect);
+        }
+
+        drawGrayHorizontalBar( p, innerGrayCol );
+
+        // Infine disegna la selezionata sopra a tutte le altre (c'è sempre se c'è almeno una tab)
+        int x = 5 + m_selectedTabIndex * tabWidth;
+        x -= TAB_INTERSECTION_DELTA * m_selectedTabIndex;
+        standardTabRect.setX( x );
+        standardTabRect.setWidth( tabWidth );
+        drawTabInsideRect( p, standardTabRect, true,
+                          (m_selectedTabIndex > 0 ? &leftOfSelected : 0),
+                          (m_selectedTabIndex < m_tabs.size()-1 ? &rightOfSelected : 0) );
     }
-    // DEBUG - La tab attualmente selezionata (TODO: può essere nulla)
-    //QRect unSelectedTabRect(5, 5, 150 /* Width */, rect().bottom() - 5);
-
-    //QPainterPath tab = drawTabInsideRect(p, unSelectedTabRect, false);
-
-    //QRect selectedTabRect(5+unSelectedTabRect.width() - 20, 5, 150 /* Width */, rect().bottom() - 5);
-
-    //drawTabInsideRect(p, selectedTabRect, true, &tab, 0);
-
-    //p.setPen(QColor(255,0,0)); // Debug bordo tab
-    //p.drawRect(selectedTabRect); // Debug bordo tab
-
-    // Disegna la tab selezionata sopra a ogni altro controllo o bordo
-    //drawTabInsideRect(p, unSelectedTabRect, true);
 
     // TODO: usa QPainterPath::intersects per mouse hit test
 }
