@@ -4,9 +4,11 @@
 #include <QtGlobal>
 #include <QDebug>
 #include <QStyleOption>
+#include <QApplication>
 
 TabsBar::TabsBar( QWidget *parent )
-    : m_parent(parent)
+    : m_parent(parent),
+      m_draggingInProgress(false)
 {
     Q_ASSERT( parent );
 
@@ -23,10 +25,10 @@ TabsBar::TabsBar( QWidget *parent )
     m_tabs.push_back(Tab());
     m_tabs.push_back(Tab());
     m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
-    m_selectedTabIndex = 4;
+    //m_tabs.push_back(Tab());
+    //m_tabs.push_back(Tab());
+    //m_tabs.push_back(Tab());
+    m_selectedTabIndex = 2;
     //DEBUG
 }
 
@@ -187,6 +189,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             }
             else
                 temp = drawTabInsideRect( p, standardTabRect, false, &temp );
+            m_tabs[i].m_region = temp;
             //p.setPen(QColor(255 - i*20,0,0));
             //p.drawRect(standardTabRect);
         }
@@ -205,6 +208,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
                 temp = drawTabInsideRect( p, standardTabRect, false, &temp );
             if( i == m_selectedTabIndex+1 )
                 rightOfSelected = temp;
+            m_tabs[i].m_region = temp;
             //p.setPen(QColor(255 - i*20,0,0));
             //p.drawRect(standardTabRect);
         }
@@ -214,12 +218,65 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         // Infine disegna la selezionata sopra a tutte le altre (c'è sempre se c'è almeno una tab)
         int x = 5 + m_selectedTabIndex * tabWidth;
         x -= TAB_INTERSECTION_DELTA * m_selectedTabIndex;
+
+        // Fattori di aggiustamento (positivi o negativi) in caso siamo in dragging
+        if( m_draggingInProgress )
+            x += m_XTrackingDistance;
+
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
-        drawTabInsideRect( p, standardTabRect, true,
+        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true,
                           (m_selectedTabIndex > 0 ? &leftOfSelected : 0),
                           (m_selectedTabIndex < m_tabs.size()-1 ? &rightOfSelected : 0) );
     }
+}
 
-    // TODO: usa QPainterPath::intersects per mouse hit test
+// Si occupa del mouse click per cambiare una tab selezionata
+void TabsBar::mousePressEvent(QMouseEvent *evt) {
+    if ( evt->button() == Qt::LeftButton ) {
+        m_dragStartPosition = evt->pos();
+        for( size_t i=0; i<m_tabs.size(); ++i ) {
+            if(m_tabs[i].m_region.contains(m_dragStartPosition) == true) {
+                m_selectedTabIndex = (int)i;
+                repaint();
+                // TODO: inviare un signal "changedSelectedTab" con l'intero m_selectedTabIndex
+            }
+        }
+    }
+    qDebug() << "mousePressEvent " << m_dragStartPosition;
+}
+
+// Si occupa del dragging di una tab
+void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
+    if ( !(evt->buttons() & Qt::LeftButton) ) // L'unico tasto di cui ci occupiamo per il tracking
+        return;
+
+    // Calcola la distanza negativa o positiva dal punto di inizio del tracking (sarà l'offset di quanto
+    // dovrà essere spostata la QRect per disegnare la tab che stiamo trascinando)
+    m_XTrackingDistance = (evt->pos() - m_dragStartPosition).manhattanLength();
+    if ( m_XTrackingDistance < QApplication::startDragDistance() ) // Questo è effettuato prima dato che ci
+        return;                                                    // serve il valore assoluto
+    if( evt->pos().x() < m_dragStartPosition.x() )
+        m_XTrackingDistance *= -1;
+
+    qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance is " << m_XTrackingDistance;
+
+    // TODO
+    // Se abbiamo raggiunto la rect di un'altra tab, "prendiamo" il suo index
+    // In Chrome grossomodo è: se c'è una tab nella direzione in cui stiamo andando e abbiamo raggiunto la metà
+    // nella sua direzione: spostala. Poi se continuo altra metà e non succede niente. E poi si ricomincia.
+    // quindi TabWidth / 2 è il "criterio" da memorizzare
+
+
+    m_draggingInProgress = true;
+    repaint();
+}
+
+// Segnala la fine di un tracking event
+void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
+    if( m_draggingInProgress == false )
+        return;
+
+    qDebug() << "Tracking ended";
+    m_draggingInProgress = false;
 }
