@@ -8,7 +8,8 @@
 
 TabsBar::TabsBar( QWidget *parent )
     : m_parent(parent),
-      m_draggingInProgress(false)
+      m_draggingInProgress(false),
+      m_slideAnimation(this)
 {
     Q_ASSERT( parent );
 
@@ -28,7 +29,7 @@ TabsBar::TabsBar( QWidget *parent )
     //m_tabs.push_back(Tab());
     //m_tabs.push_back(Tab());
     //m_tabs.push_back(Tab());
-    m_selectedTabIndex = 2;
+    m_selectedTabIndex = 3;
     //DEBUG
 }
 
@@ -162,7 +163,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     //                  tabWidth = 3w / 3                                                 ------------------
     //                  tabWidth += (3w - (3-1)*d)/3                                                   --------------  2d
     //                                                                                                               ------
-    int tabWidth = ( rect().width() - (5 + 20 /* bordo sx 5 px, bordo dx 20 px */) ) / (int)m_tabs.size();
+    tabWidth = ( rect().width() - (5 + 20 /* bordo sx 5 px, bordo dx 20 px */) ) / (int)m_tabs.size();
     int tabHeight = rect().bottom() - 5;
     tabWidth += ( TAB_INTERSECTION_DELTA * (int)(m_tabs.size() - 1) ) / (int)m_tabs.size();
     // Clamping del risultato ai valori max e min
@@ -220,8 +221,9 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         x -= TAB_INTERSECTION_DELTA * m_selectedTabIndex;
 
         // Fattori di aggiustamento (positivi o negativi) in caso siamo in dragging
-        if( m_draggingInProgress )
-            x += m_XTrackingDistance;
+        if( m_draggingInProgress ) {
+            x += m_XTrackingDistance; // La tab deve rimanere dove la stavamo trascinando
+        }
 
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
@@ -235,6 +237,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
 void TabsBar::mousePressEvent(QMouseEvent *evt) {
     if ( evt->button() == Qt::LeftButton ) {
         m_dragStartPosition = evt->pos();
+        m_selectionStartIndex = m_selectedTabIndex;
         for( size_t i=0; i<m_tabs.size(); ++i ) {
             if(m_tabs[i].m_region.contains(m_dragStartPosition) == true) {
                 m_selectedTabIndex = (int)i;
@@ -253,19 +256,54 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
     // Calcola la distanza negativa o positiva dal punto di inizio del tracking (sarà l'offset di quanto
     // dovrà essere spostata la QRect per disegnare la tab che stiamo trascinando)
-    m_XTrackingDistance = (evt->pos() - m_dragStartPosition).manhattanLength();
-    if ( m_XTrackingDistance < QApplication::startDragDistance() ) // Questo è effettuato prima dato che ci
-        return;                                                    // serve il valore assoluto
-    if( evt->pos().x() < m_dragStartPosition.x() )
-        m_XTrackingDistance *= -1;
+    m_XTrackingDistance = evt->pos().x() - m_dragStartPosition.x();
 
-    qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance is " << m_XTrackingDistance;
+    qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance(" << m_XTrackingDistance << "), tabWidth(" << tabWidth << "),"
+             << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
 
-    // TODO
     // Se abbiamo raggiunto la rect di un'altra tab, "prendiamo" il suo index
     // In Chrome grossomodo è: se c'è una tab nella direzione in cui stiamo andando e abbiamo raggiunto la metà
     // nella sua direzione: spostala. Poi se continuo altra metà e non succede niente. E poi si ricomincia.
-    // quindi TabWidth / 2 è il "criterio" da memorizzare
+    // quindi tabWidth / 2 è il "criterio" da memorizzare
+    if( abs(m_XTrackingDistance) > tabWidth / 2 ) {
+        // Effettuiamo uno swap se c'è almeno una tab in quella direzione
+        if( m_XTrackingDistance > 0 ) {
+            if( m_tabs.size()-1 > m_selectedTabIndex ) {
+                // Swap del contenuto del vettore delle tabs e aggiorno il nuovo indice
+                //qDebug() << "Swap della corrente (index: " << m_selectedTabIndex << ") con tab index: " << m_selectedTabIndex+1;
+                std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex+1]);
+                ++m_selectedTabIndex;
+                // Una volta che una tab ha superato di tabWidth/2 in una direzione, si swappa con la prima tab in quella
+                // direzione:
+                //                  |-------|                      |-------|
+                // (startDragPoint) |   1   | -------------------> |   2   |
+                //                  |-------|                      |-------|
+                //         XTrackingDistance è appena diventato maggiore di tabWidth / 2, è ora di swappare
+                //
+                // però anche il punto di inizio si sposta avanti
+                //                  |-------|                      |-------|
+                //                  |   2   | --(startDragPoint)-> |   1   |
+                //                  |-------|                      |-------|
+                //         XTrackingDistance -= tabWidth, ora è negativo e infatti la tab 1 è spostata a sinistra e
+                //         non ha ancora raggiunto la posizione di equilibrio nel nuovo rettangolo
+                //
+                m_XTrackingDistance -= tabWidth;
+                //qDebug() << "m_XTrackingDistance -= tabWidth => m_XTrackingDistance(" << m_XTrackingDistance << ")";
+                m_dragStartPosition.setX(m_dragStartPosition.x() + tabWidth);
+                //qDebug() << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
+            }
+        } else {
+            if( m_selectedTabIndex > 0 )
+                // Swap del contenuto del vettore delle tabs e aggiorno il nuovo indice
+                qDebug() << "Swap della corrente (index: " << m_selectedTabIndex << ") con tab index: " << m_selectedTabIndex-1;
+                std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex-1]);
+                --m_selectedTabIndex;
+                // Stesso ragionamento (inverso) del caso sopra
+                m_XTrackingDistance += tabWidth;
+                qDebug() << "m_XTrackingDistance += tabWidth => m_XTrackingDistance(" << m_XTrackingDistance << ")";
+                m_dragStartPosition.setX(m_dragStartPosition.x() - tabWidth);
+        }
+    }
 
 
     m_draggingInProgress = true;
@@ -278,5 +316,32 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
         return;
 
     qDebug() << "Tracking ended";
-    m_draggingInProgress = false;
+    //m_draggingInProgress = false;
+
+    // Anima il "ritorno" alla posizione corretta, i.e. diminuisce a zero il XTrackingDistance
+    m_slideAnimation.setDuration(1000);
+    m_slideAnimation.setStartValue(m_XTrackingDistance);
+    m_slideAnimation.setEndValue(0);
+    m_slideAnimation.start();
+}
+
+
+
+SlideToPositionAnimation::SlideToPositionAnimation( TabsBar *parent ) :
+    m_parent(parent)
+{
+    connect(this, SIGNAL(finished()), SLOT(animationHasFinished()));
+}
+
+// Metodo chiamato ad ogni variazione del valore di interpolazione, deve assicurarsi di aggiornare
+// l'XTrackingDistance di ogni tab
+void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
+    // Aggiorna m_XTrackingDistance
+    //qDebug() << "updateCurrentValue(" << value.toInt() << ")";
+    m_parent->m_XTrackingDistance = value.toInt();
+    m_parent->repaint();
+}
+
+void SlideToPositionAnimation::animationHasFinished() {
+    m_parent->m_draggingInProgress = false;
 }

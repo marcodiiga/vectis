@@ -4,7 +4,6 @@
 #include <QScrollBar>
 #include <QTextEdit>
 #include <QPropertyAnimation>
-#include <memory>
 
 class ScrollBar;
 // Questa classe si occupa di "mangiare" gli eventi PageUp/PageDown da parte del QTextEdit widget per
@@ -35,9 +34,9 @@ private:
     int   m_maxViewVisibleLines; // Le righe che la view corrente del controllo testo può visualizzare
     qreal m_textLineHeight;
     int   m_internalLineCount; // Le righe reali del controllo testo (non è moltiplicato per lineHeight)
-    std::unique_ptr<QPropertyAnimation> m_scrollAnim;
+    QPropertyAnimation m_scrollAnim;
     bool  m_sliderIsBeingDragged;
-    std::unique_ptr<PgKeyEater> m_pgKeyEater;
+    PgKeyEater m_pgKeyEater;
 
     friend class PgKeyEater; // Il filtro ha bisogno di accedere alla m_scrollAnim per indicare se alla fine
                              // dell'animazione il caret dovrà essere spostato o meno (PgUp/Down soltanto)

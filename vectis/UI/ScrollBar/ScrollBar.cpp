@@ -16,12 +16,12 @@ bool PgKeyEater::eventFilter ( QObject *obj, QEvent *event ) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
         // Mangia completamente il pageup/pagedown; verrà gestito dalla scrollbar verticale (TODO: evitare questo per orizzontali)
         if( keyEvent->key() == Qt::Key_PageUp ) {
-            m_scrollBar->m_scrollAnim->setProperty( "pageStepEvent", 1 ); // Segnala che l'evento era un PgUp
+            m_scrollBar->m_scrollAnim.setProperty( "pageStepEvent", 1 ); // Segnala che l'evento era un PgUp
             // Imposta la nuova posizione manualmente, dato che questo evento sarà mangiato interamente
             m_scrollBar->setSliderPosition( m_scrollBar->sliderPosition() - m_scrollBar->pageStep() );
             return true; // Evento completamente gestito, interrompi l'handling per le sottoclassi
         } else if ( keyEvent->key() == Qt::Key_PageDown ) {
-            m_scrollBar->m_scrollAnim->setProperty( "pageStepEvent", 2 ); // PgDown
+            m_scrollBar->m_scrollAnim.setProperty( "pageStepEvent", 2 ); // PgDown
             m_scrollBar->setSliderPosition( m_scrollBar->sliderPosition() + m_scrollBar->pageStep() ); // Idem sopra
             return true;
         }
@@ -35,7 +35,12 @@ ScrollBar::ScrollBar ( QTextEdit * parent ) :
     m_parent(parent),
     m_textLineHeight(1), // Altezza di ogni riga, dipende dal font usato (anche se è sempre monospaced)
     m_internalLineCount(1), // Quante righe ci sono nel documento realmente
-    m_sliderIsBeingDragged(false)
+    m_sliderIsBeingDragged(false),
+    m_scrollAnim(this, "value"), // Un timer per una animazione di scorrimento più gradevole
+    m_pgKeyEater(this) // Un filtro tastiera per annullare il pageup/down e gestirlo internamente (è necessario poichè
+                       // altrimenti non si può evitare che il caret, che viene spostato con pagedown/up, cambi il
+                       // valore di dove punta la scrollbar e alla prossima animazione ci sia uno spostamento immediato
+                       // sbagliato)
 {
     Q_ASSERT( parent );
 
@@ -53,20 +58,14 @@ ScrollBar::ScrollBar ( QTextEdit * parent ) :
     connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
 
-    // Un timer per una animazione di scorrimento più gradevole
-    m_scrollAnim.reset( new QPropertyAnimation(this, "value") );
-    // Un filtro tastiera per annullare il pageup/down e gestirlo internamente (è necessario poichè
-    // altrimenti non si può evitare che il caret, che viene spostato con pagedown/up, cambi il valore di dove
-    // punta la scrollbar e alla prossima animazione ci sia uno spostamento immediato sbagliato)
-    m_pgKeyEater.reset( new PgKeyEater(this) ); // TODOcpp14: usa make_unique per ogni smart pointer
     // Installa il PageDown/PageUp key eater per il controllo parent
-    m_parent->installEventFilter( m_pgKeyEater.get() );
+    m_parent->installEventFilter( &m_pgKeyEater );
     // Muove il caret alla fine dell'animazione di scroll (property pageStepEvent aiuta a non farlo per il mouse scroll)
-    connect( m_scrollAnim.get(), SIGNAL(finished()), this, SLOT(moveParentCaret()) );
+    connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
 }
 
 ScrollBar::~ScrollBar() {
-    m_parent->removeEventFilter(m_pgKeyEater.get());
+    m_parent->removeEventFilter(&m_pgKeyEater);
 }
 
 // Eventi di tracking (l'utente sta muovendo il caret a mano)
@@ -81,7 +80,7 @@ void ScrollBar::sliderPressed () {
 // è terminata (così non ci sono intoppi nella scorrevolezza). Utile quando è stato chiamato un PageUp/PageDown.
 // Un mousescroll non causa movimento del caret e quindi non viene gestito (pageStepEvent rimane 0 in quel caso)
 void ScrollBar::moveParentCaret() {
-    int pageValue = m_scrollAnim->property("pageStepEvent").toInt();
+    int pageValue = m_scrollAnim.property("pageStepEvent").toInt();
     if(pageValue > 0) { // PageDown o PageUp è stato premuto
         QTextCursor cursor = m_parent->textCursor();
         // Riavvolge il cursore all'inizio del documento e poi lo posiziona alla riga dove doveva essere posizionato
@@ -89,7 +88,7 @@ void ScrollBar::moveParentCaret() {
         cursor.movePosition( QTextCursor::NextBlock, QTextCursor::MoveAnchor,
                              value() / m_textLineHeight); // Ricorda che il valore dello slider è indice_riga * altezza_riga
         m_parent->setTextCursor(cursor);
-        m_scrollAnim->setProperty("pageStepEvent", 0); // Aiuta a non resettare il caret per un mouse scroll (non serve)
+        m_scrollAnim.setProperty("pageStepEvent", 0); // Aiuta a non resettare il caret per un mouse scroll (non serve)
     }
 }
 
@@ -102,13 +101,13 @@ void ScrollBar::actionTriggered ( int action ) {
         return;
 
     // Se una animazione è già in corso interrompila: i valori saranno aggiornati e una nuova animazione ripartirà
-    if(m_scrollAnim->state() == QAbstractAnimation::State::Running)
-        m_scrollAnim->stop();
+    if(m_scrollAnim.state() == QAbstractAnimation::State::Running)
+        m_scrollAnim.stop();
 
-    m_scrollAnim->setDuration(120);
-    m_scrollAnim->setStartValue(value());
-    m_scrollAnim->setEndValue(sliderPosition());
-    m_scrollAnim->start();
+    m_scrollAnim.setDuration(120);
+    m_scrollAnim.setStartValue(value());
+    m_scrollAnim.setEndValue(sliderPosition());
+    m_scrollAnim.start();
 }
 
 // Quando il controllo viene resizato, si aggiorna anche il numero massimo di righe che possiamo visualizzare
