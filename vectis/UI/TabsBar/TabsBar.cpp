@@ -8,8 +8,7 @@
 
 TabsBar::TabsBar( QWidget *parent )
     : m_parent(parent),
-      m_draggingInProgress(false),
-      m_slideAnimation(this)
+      m_draggingInProgress(false)
 {
     Q_ASSERT( parent );
 
@@ -19,23 +18,37 @@ TabsBar::TabsBar( QWidget *parent )
     //qInstallMessageHandler(crashMessageOutput);
     setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
 
+    QFont font("Verdana");
+    font.setPixelSize(10);
+    this->setFont(font);
+
     //DEBUG
     //DEBUG
     // cazzeggia qui per provare le tab
-    m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
-    m_tabs.push_back(Tab());
+
+    // TODO: fai un metodo "insertNewTab"
+    m_tabs.push_back(Tab("First tab"));
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+
+    m_tabs.push_back(Tab("Second tab"));
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+
+    m_tabs.push_back(Tab("Third tab"));
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+
+    m_tabs.push_back(Tab("Fourth tab"));
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+
     //m_tabs.push_back(Tab());
     //m_tabs.push_back(Tab());
     //m_tabs.push_back(Tab());
-    m_selectedTabIndex = 3;
+    m_selectedTabIndex = 1;
     //DEBUG
 }
 
 // Disegna una tab selezionata o meno dentro un rect. Se si conoscono tab a destra e sinistra, consente di
 // migliorarne l'aspetto inserendo una sfumatura
-QPainterPath TabsBar::drawTabInsideRect( QPainter& p, const QRect& tabRect, bool selected,
+QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text,
                                          const QPainterPath* sxTabRect, const QPainterPath* dxTabRect ) {
     // Decide i colori per una tab selected o unselected
     QColor topGradientColor, bottomGradientColor;
@@ -84,7 +97,7 @@ QPainterPath TabsBar::drawTabInsideRect( QPainter& p, const QRect& tabRect, bool
     p.setRenderHint(QPainter::SmoothPixmapTransform);
     // Una volta riempito (fillato) lo sfondo, si può disegnare sopra un bordo grigio ed
     // una path attaccata alla prima come un bordo nero traslata di 1 in alto
-    const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(70,70,67) );
+    const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(40,40,40) );
     QPainterPath blackOuterTabPath = tabPath.translated(0, -1);
     p.setPen( blackPen );
     p.drawPath( blackOuterTabPath );
@@ -110,6 +123,18 @@ QPainterPath TabsBar::drawTabInsideRect( QPainter& p, const QRect& tabRect, bool
         p.drawLine( tabRect.left() + tabRect.height() / 4, tabRect.bottom(),
                     tabRect.right() - tabRect.height() / 4, tabRect.bottom() );
     }
+
+    // Disegna il testo della tab nel sottorettangolo disponibile
+    if( selected == true )
+        p.setPen( Qt::white );
+    else
+        p.setPen( QPen(QColor(193,193,191)) );
+    QRectF textRect = tabRect;
+    textRect.setX(tabRect.x() + h);
+    textRect.setWidth(tabRect.width() - 2*h);
+    textRect.setY(textRect.y() + 6);
+    p.drawText(textRect,  Qt::AlignLeft, QString(text));
+
     return tabPath; // Questo servirà per sfumare i bordi della selected, in caso questa tab sia ad essa vicina
 }
 
@@ -180,16 +205,18 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             int x = 5 + i * tabWidth;
             x -= TAB_INTERSECTION_DELTA * i;
             standardTabRect.setX( x );
+            // Se abbiamo un offset in decreasing, aggiungicelo
+            if(m_tabs[i].m_offset != 0) {
+                standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_offset);
+            }
             standardTabRect.setWidth( tabWidth );
-            //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
-            //            standardTabRect.width() << "," << standardTabRect.height();
 
             if(i == m_selectedTabIndex - 1) { // La prima non ha bisogno di "overlapping" con nessuna
-                temp = drawTabInsideRect( p, standardTabRect, false );
+                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
                 leftOfSelected = temp;
             }
             else
-                temp = drawTabInsideRect( p, standardTabRect, false, &temp );
+                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title, &temp );
             m_tabs[i].m_region = temp;
             //p.setPen(QColor(255 - i*20,0,0));
             //p.drawRect(standardTabRect);
@@ -199,17 +226,22 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             int x = 5 + i * tabWidth;
             x -= TAB_INTERSECTION_DELTA * i;
             standardTabRect.setX( x );
+            // Se abbiamo un offset in decreasing, aggiungicelo
+            if(m_tabs[i].m_offset != 0) {
+                standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_offset);
+            }
             standardTabRect.setWidth( tabWidth );
             //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
             //            standardTabRect.width() << "," << standardTabRect.height();
 
             if(i == m_tabs.size()-1) // La prima non ha bisogno di "overlapping" con nessuna
-                temp = drawTabInsideRect( p, standardTabRect, false );
+                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
             else
-                temp = drawTabInsideRect( p, standardTabRect, false, &temp );
+                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title, &temp );
             if( i == m_selectedTabIndex+1 )
                 rightOfSelected = temp;
             m_tabs[i].m_region = temp;
+            //m_tabs[i].m_rect = standardTabRect;
             //p.setPen(QColor(255 - i*20,0,0));
             //p.drawRect(standardTabRect);
         }
@@ -223,13 +255,18 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         // Fattori di aggiustamento (positivi o negativi) in caso siamo in dragging
         if( m_draggingInProgress ) {
             x += m_XTrackingDistance; // La tab deve rimanere dove la stavamo trascinando
+        } else if(m_tabs[m_selectedTabIndex].m_offset != 0) {
+            x += m_tabs[m_selectedTabIndex].m_offset;
         }
-
+//qDebug() << "x is " << x;
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
-        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true,
+        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex].m_title,
                           (m_selectedTabIndex > 0 ? &leftOfSelected : 0),
                           (m_selectedTabIndex < m_tabs.size()-1 ? &rightOfSelected : 0) );
+        m_tabs[m_selectedTabIndex].m_rect = standardTabRect;
+        //p.setPen(QColor(255 - 5*20,0,0));
+        //p.drawRect(standardTabRect);
     }
 }
 
@@ -254,12 +291,24 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
     if ( !(evt->buttons() & Qt::LeftButton) ) // L'unico tasto di cui ci occupiamo per il tracking
         return;
 
+    int mouseXPosition = evt->pos().x();
+
+    // NON permette di trascinare una tab fuori dall'area designata del controllo [+5;width-20]
+    int tabRelativeX = 5 + m_selectedTabIndex * tabWidth;
+    tabRelativeX -= TAB_INTERSECTION_DELTA * m_selectedTabIndex;
+    tabRelativeX = m_dragStartPosition.x() - tabRelativeX;
+    //qDebug() << tabRelativeX;
+    if( mouseXPosition < 5 + tabRelativeX )
+        mouseXPosition = 5 + tabRelativeX;
+    if( mouseXPosition > this->width() - 20 - (tabWidth - tabRelativeX) )
+        mouseXPosition = this->width() - 20 - (tabWidth - tabRelativeX);
+
     // Calcola la distanza negativa o positiva dal punto di inizio del tracking (sarà l'offset di quanto
     // dovrà essere spostata la QRect per disegnare la tab che stiamo trascinando)
-    m_XTrackingDistance = evt->pos().x() - m_dragStartPosition.x();
+    m_XTrackingDistance = mouseXPosition - m_dragStartPosition.x();
 
-    qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance(" << m_XTrackingDistance << "), tabWidth(" << tabWidth << "),"
-             << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
+    //qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance(" << m_XTrackingDistance << "), tabWidth(" << tabWidth << "),"
+    //        << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
 
     // Se abbiamo raggiunto la rect di un'altra tab, "prendiamo" il suo index
     // In Chrome grossomodo è: se c'è una tab nella direzione in cui stiamo andando e abbiamo raggiunto la metà
@@ -270,9 +319,14 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
         if( m_XTrackingDistance > 0 ) {
             if( m_tabs.size()-1 > m_selectedTabIndex ) {
                 // Swap del contenuto del vettore delle tabs e aggiorno il nuovo indice
+                setUpdatesEnabled(false);   // Disabilita i paint() FINO al termine di tutti gli aggiornamenti & del set
+                                            // dell'interpolatore per la tab "detronizzata".
+
                 //qDebug() << "Swap della corrente (index: " << m_selectedTabIndex << ") con tab index: " << m_selectedTabIndex+1;
                 std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex+1]);
-                ++m_selectedTabIndex;
+                //qDebug() << m_tabs[m_selectedTabIndex].m_rect;
+                //qDebug() << m_tabs[m_selectedTabIndex+1].m_rect;
+
                 // Una volta che una tab ha superato di tabWidth/2 in una direzione, si swappa con la prima tab in quella
                 // direzione:
                 //                  |-------|                      |-------|
@@ -287,21 +341,45 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
                 //         XTrackingDistance -= tabWidth, ora è negativo e infatti la tab 1 è spostata a sinistra e
                 //         non ha ancora raggiunto la posizione di equilibrio nel nuovo rettangolo
                 //
-                m_XTrackingDistance -= tabWidth;
+                // NOTA BENE: aumentare un posto a dx significa anche compensare il TAB_INTERSECTION_DELTA (uno in meno)
+                m_XTrackingDistance = -(tabWidth / 2) + TAB_INTERSECTION_DELTA;
                 //qDebug() << "m_XTrackingDistance -= tabWidth => m_XTrackingDistance(" << m_XTrackingDistance << ")";
-                m_dragStartPosition.setX(m_dragStartPosition.x() + tabWidth);
+                m_dragStartPosition.setX(m_dragStartPosition.x() + tabWidth - TAB_INTERSECTION_DELTA);
                 //qDebug() << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
+
+                // Avvia l'interpolatore per lo swap dell'altra tab (deve tornare alla sua posizione di equilibrio)
+                int offset = tabWidth - TAB_INTERSECTION_DELTA;
+                m_tabs[m_selectedTabIndex].m_offset = offset; // Deve andare a zero
+
+                ++m_selectedTabIndex;
+                m_interpolators[m_selectedTabIndex-1]->setDuration(200);
+                m_interpolators[m_selectedTabIndex-1]->setStartValue(offset);
+                m_interpolators[m_selectedTabIndex-1]->setEndValue(0);
+                m_interpolators[m_selectedTabIndex-1]->start();
+                setUpdatesEnabled(true);
             }
         } else {
             if( m_selectedTabIndex > 0 )
                 // Swap del contenuto del vettore delle tabs e aggiorno il nuovo indice
-                qDebug() << "Swap della corrente (index: " << m_selectedTabIndex << ") con tab index: " << m_selectedTabIndex-1;
+                setUpdatesEnabled(false);   // Disabilita i paint() FINO al termine di tutti gli aggiornamenti & del set
+                                            // dell'interpolatore per la tab "detronizzata".
+                //qDebug() << "Swap della corrente (index: " << m_selectedTabIndex << ") con tab index: " << m_selectedTabIndex-1;
                 std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex-1]);
-                --m_selectedTabIndex;
+
                 // Stesso ragionamento (inverso) del caso sopra
-                m_XTrackingDistance += tabWidth;
-                qDebug() << "m_XTrackingDistance += tabWidth => m_XTrackingDistance(" << m_XTrackingDistance << ")";
-                m_dragStartPosition.setX(m_dragStartPosition.x() - tabWidth);
+                m_XTrackingDistance = +(tabWidth / 2) - TAB_INTERSECTION_DELTA;
+                m_dragStartPosition.setX(m_dragStartPosition.x() - tabWidth + TAB_INTERSECTION_DELTA);
+
+                // Avvia l'interpolatore per lo swap dell'altra tab (deve tornare alla sua posizione di equilibrio)
+                int offset = tabWidth - TAB_INTERSECTION_DELTA;
+                m_tabs[m_selectedTabIndex].m_offset = offset; // Deve andare a zero
+
+                --m_selectedTabIndex;
+                m_interpolators[m_selectedTabIndex+1]->setDuration(200);
+                m_interpolators[m_selectedTabIndex+1]->setStartValue(offset);
+                m_interpolators[m_selectedTabIndex+1]->setEndValue(0);
+                m_interpolators[m_selectedTabIndex+1]->start();
+                setUpdatesEnabled(true);
         }
     }
 
@@ -316,32 +394,40 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
         return;
 
     qDebug() << "Tracking ended";
-    //m_draggingInProgress = false;
 
     // Anima il "ritorno" alla posizione corretta, i.e. diminuisce a zero il XTrackingDistance
-    m_slideAnimation.setDuration(1000);
-    m_slideAnimation.setStartValue(m_XTrackingDistance);
-    m_slideAnimation.setEndValue(0);
-    m_slideAnimation.start();
+    m_tabs[m_selectedTabIndex].m_offset = m_XTrackingDistance; // Deve andare a zero
+    m_interpolators[m_selectedTabIndex]->setDuration(200);
+    m_interpolators[m_selectedTabIndex]->setStartValue(m_XTrackingDistance);
+    m_interpolators[m_selectedTabIndex]->setEndValue(0);
+    m_interpolators[m_selectedTabIndex]->start();
+
+    m_draggingInProgress = false;
 }
 
 
 
-SlideToPositionAnimation::SlideToPositionAnimation( TabsBar *parent ) :
-    m_parent(parent)
+SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex ) :
+    m_parent(parent),
+    m_associatedTabIndex(associatedTabIndex)
 {
     connect(this, SIGNAL(finished()), SLOT(animationHasFinished()));
 }
 
 // Metodo chiamato ad ogni variazione del valore di interpolazione, deve assicurarsi di aggiornare
-// l'XTrackingDistance di ogni tab
+// l'offset di ogni tab
 void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
     // Aggiorna m_XTrackingDistance
     //qDebug() << "updateCurrentValue(" << value.toInt() << ")";
-    m_parent->m_XTrackingDistance = value.toInt();
-    m_parent->repaint();
+    //m_parent->m_XTrackingDistance = value.toInt();
+    //m_parent->repaint();
+
+    // Aggiorna l'offset per la tab associata
+    m_parent.m_tabs[m_associatedTabIndex].m_offset = value.toInt();
+    // repaint?
+    m_parent.repaint();
 }
 
 void SlideToPositionAnimation::animationHasFinished() {
-    m_parent->m_draggingInProgress = false;
+    //m_parent.m_draggingInProgress = false;
 }
