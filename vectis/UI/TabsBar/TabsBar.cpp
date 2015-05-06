@@ -12,8 +12,8 @@ TabsBar::TabsBar( QWidget *parent )
 {
     Q_ASSERT( parent );
 
-    // WA_OpaquePaintEvent specifica che ridisegneremo il controllo ogni volta che ce n'è bisogno
-    // senza intervento del sistema.
+    // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without
+    // any system intervention
     setAttribute( Qt::WA_OpaquePaintEvent, false );
     //qInstallMessageHandler(crashMessageOutput);
     setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
@@ -24,9 +24,9 @@ TabsBar::TabsBar( QWidget *parent )
 
     //DEBUG
     //DEBUG
-    // cazzeggia qui per provare le tab
+    // Tryouts here for tabs
 
-    // TODO: fai un metodo "insertNewTab"
+    // TODO: make a method "insertNewTab"
     m_tabs.push_back(Tab("First tab"));
     m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
 
@@ -46,11 +46,11 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
 }
 
-// Disegna una tab selezionata o meno dentro un rect. Se si conoscono tab a destra e sinistra, consente di
-// migliorarne l'aspetto inserendo una sfumatura
+// Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
+// look by adding a nuance
 QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text,
                                          const QPainterPath* sxTabRect, const QPainterPath* dxTabRect ) {
-    // Decide i colori per una tab selected o unselected
+    // Decide colors for a selected or unselected tab
     QColor topGradientColor, bottomGradientColor;
     if( selected == false ) { // Unselected
         topGradientColor = QColor(54, 54, 52);
@@ -59,11 +59,11 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
         topGradientColor = QColor(52, 53, 47);
         bottomGradientColor = QColor(39, 40, 34);
     }
-    // Disegna due curve di bezièr e una linea orizzontale per la tab
+    // Draw two bezièr curves and a horizontal line for the tab
     //  _______________
     // |0;0  c2  /     |h;0
     // |       _/      |
-    // |     _/        |     Quadrato di contenimento della curva sx
+    // |     _/        |     Containing square for the left curve
     // |    /          |
     // |___/____c1_____|
     // 0;h              h;h
@@ -71,7 +71,7 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     p.setRenderHint(QPainter::Antialiasing);
     const QPointF c1(0.6f, 1.0f-0.01f), c2(0.53f, 1.0f-1.0f);
     const int h = tabRect.height();
-    tabPath.moveTo(tabRect.x(), tabRect.y() + tabRect.height() + 1); // QRect ha bordi di 1 px, compenso
+    tabPath.moveTo(tabRect.x(), tabRect.y() + tabRect.height() + 1); // QRect has 1px borders, compensation
     //qDebug() << selectedTabRect.x() << " " << selectedTabRect.y() + selectedTabRect.height() + 1;
     tabPath.cubicTo(tabRect.x() + h * c1.x(), tabRect.y() + h * c1.y(),
                  tabRect.x() + h * c2.x(), tabRect.y() + h * c2.y(),
@@ -79,30 +79,30 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     //qDebug() << selectedTabRect.x() + h << " " << selectedTabRect.y();
 
     int dxStartBez = tabRect.x() + tabRect.width() - h;
-    tabPath.lineTo(dxStartBez, tabRect.y()); // Larghezza della tab
+    tabPath.lineTo(dxStartBez, tabRect.y()); // Tab width
 
-    // Disegna la bezièr dx
+    // Draw right bezièr
     tabPath.cubicTo(dxStartBez + (h - h * c2.x()), tabRect.y() + h * c2.y(),
                     dxStartBez + (h - h * c1.x()), tabRect.y() + h * c1.y(),
                     tabRect.x() + tabRect.width(), tabRect.y() + tabRect.height() + 1);
 
-    // Riempie la tabPath con un gradiente di sfondo
-    QLinearGradient tabGradient( tabRect.topLeft(), tabRect.bottomLeft() ); // Direzione verticale
-    tabGradient.setColorAt( 1, bottomGradientColor ); // Colore finale è lo sfondo della code text box
-    tabGradient.setColorAt( 0, topGradientColor ); // Colore iniziale (in alto) è più chiaro
+    // Fill the tabPath with a background gradient
+    QLinearGradient tabGradient( tabRect.topLeft(), tabRect.bottomLeft() ); // Vertical direction
+    tabGradient.setColorAt( 1, bottomGradientColor ); // Final color is the code text box background
+    tabGradient.setColorAt( 0, topGradientColor ); // Initial color (at the top) is brighter
     QBrush tabBrushFill( tabGradient );
     p.setBrush( tabBrushFill );
     p.fillPath( tabPath, tabBrushFill );
 
     p.setRenderHint(QPainter::SmoothPixmapTransform);
-    // Una volta riempito (fillato) lo sfondo, si può disegnare sopra un bordo grigio ed
-    // una path attaccata alla prima come un bordo nero traslata di 1 in alto
+    // Once filled the background, a gray border can be drawn above it and also a path attached to the first one
+    // looking like a black border translated 1px upper
     const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(40,40,40) );
     QPainterPath blackOuterTabPath = tabPath.translated(0, -1);
     p.setPen( blackPen );
     p.drawPath( blackOuterTabPath );
 
-    // Il bordo nero esterno va sfumato se ci sono delle tab di sfondo, altrimenti c'è uno stacco troppo netto
+    // Black outer border needs to fade out if there are background tabs, otherwise there's a too-strong distinction
     p.setRenderHint( QPainter::Antialiasing, false );
     p.setRenderHint( QPainter::HighQualityAntialiasing, false );
     if( sxTabRect != 0 ) {
@@ -118,13 +118,13 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     p.setPen( grayPen );
     p.drawPath( tabPath );
 
-    if(selected == false) { // Le tab unselected hanno una ulteriore leggera sfumatura in basso
+    if(selected == false) { // Unselected tabs have an additional nuanced shading on the bottom
         p.setPen( QPen( QColor( 60,61,56 ) ) );
         p.drawLine( tabRect.left() + tabRect.height() / 4, tabRect.bottom(),
                     tabRect.right() - tabRect.height() / 4, tabRect.bottom() );
     }
 
-    // Disegna il testo della tab nel sottorettangolo disponibile
+    // Draw the tab's text in the subrectangle available
     if( selected == true )
         p.setPen( Qt::white );
     else
@@ -135,26 +135,26 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     textRect.setY(textRect.y() + 6);
     p.drawText(textRect,  Qt::AlignLeft, QString(text));
 
-    return tabPath; // Questo servirà per sfumare i bordi della selected, in caso questa tab sia ad essa vicina
+    return tabPath; // This will be used to fade the selected tab's borders, in case this tab was near the selected one
 }
 
-// Disegna una barra orizzontale di separazione per il controllo
+// Draw an horizontal bar to separate the control from the rest
 void TabsBar::drawGrayHorizontalBar( QPainter& p , const QColor innerGrayCol ) {
     p.setRenderHint( QPainter::Antialiasing, false );
     p.setRenderHint( QPainter::HighQualityAntialiasing, false );
 
-    // Disegna la barra orizzontale in basso che si collega al CodeTextEdit;
-    // questa corre per tutto il code editor *tranne* che per la selected tab
+    // Draw the horizontal bar at the bottom linked to the CodeTextEdit;
+    // this runs for all the code editor control *except* on the selected tab
     const QPen grayPen( innerGrayCol );
     p.setPen( grayPen );
     p.drawLine( rect().left(), rect().bottom(), rect().right(), rect().bottom() );
 }
 
 void TabsBar::paintEvent ( QPaintEvent* ) {
-    Q_ASSERT( m_selectedTabIndex == -1 || // Nulla è selezionato, oppure siamo entro i limiti del numero di tab
+    Q_ASSERT( m_selectedTabIndex == -1 || // Nothing was selected or we're into a valid tab range
               ( m_selectedTabIndex != -1 && m_selectedTabIndex < m_tabs.size() ) );
 
-    QStyleOption opt; // Permette il setting del background via styleSheet
+    QStyleOption opt; // Allows background setting via styleSheet
     opt.init(this);
     QPainter p(this);
     style()->drawPrimitive(QStyle::PE_Widget, &opt, &p, this);
@@ -163,10 +163,10 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
 
     if( m_selectedTabIndex == -1 ) {
         drawGrayHorizontalBar( p, innerGrayCol );
-        return; // Nient'altro dev'essere disegnato
+        return; // Nothing else has to be drawn
     }
 
-    // Disegna le tab secondo un preciso ordine:
+    // Draws the tabs following a precise order:
     // -> prima quelle NON selezionate a destra e a sinistra della selezionata, partendo da quella più vicina
     // alla selezionata per poi andare verso le esterne
     // -> poi la linea grigia orizzontale, sarà visibile dove NON ci sono tab
