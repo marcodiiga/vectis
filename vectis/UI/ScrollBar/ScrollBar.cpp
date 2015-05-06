@@ -3,64 +3,61 @@
 #include <QPainter>
 #include <QAbstractTextDocumentLayout>
 #include <QTextBlock>
-#include <QDebug> // TODO: rimuovi quando il resize è terminato
+#include <QDebug> // TODO: remove when resize is finished
 
-// Un filtro per gli eventi PageDown/Up per evitare il problema dello spostamento del caret che provoca una errata
-// animazione di scroll
+// A filter for PageDown/Up events to avoid the caret movement problem which causes a wrong scroll animation
 PgKeyEater::PgKeyEater ( ScrollBar *scrollBar ) :
     m_scrollBar( scrollBar ) {
 }
 
 bool PgKeyEater::eventFilter ( QObject *obj, QEvent *event ) {
-    if ( event->type() == QEvent::KeyPress ) { // L'unico evento da gestire è il PgDown/Up
+    if ( event->type() == QEvent::KeyPress ) { // The only event to be handled is the PgDown/Up
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        // Mangia completamente il pageup/pagedown; verrà gestito dalla scrollbar verticale (TODO: evitare questo per orizzontali)
+        // Completely eat the pageup/pagedown; it will be handled by the vertical scrollbar (TODO: avoid this for horizontal scrollbars)
         if( keyEvent->key() == Qt::Key_PageUp ) {
-            m_scrollBar->m_scrollAnim.setProperty( "pageStepEvent", 1 ); // Segnala che l'evento era un PgUp
-            // Imposta la nuova posizione manualmente, dato che questo evento sarà mangiato interamente
+            m_scrollBar->m_scrollAnim.setProperty( "pageStepEvent", 1 ); // Signal that the event was a PgUp
+            // Set the new position manually since this will be eaten up completely
             m_scrollBar->setSliderPosition( m_scrollBar->sliderPosition() - m_scrollBar->pageStep() );
-            return true; // Evento completamente gestito, interrompi l'handling per le sottoclassi
+            return true; // Event was completely handled, interrupt handling for all subclasses
         } else if ( keyEvent->key() == Qt::Key_PageDown ) {
             m_scrollBar->m_scrollAnim.setProperty( "pageStepEvent", 2 ); // PgDown
-            m_scrollBar->setSliderPosition( m_scrollBar->sliderPosition() + m_scrollBar->pageStep() ); // Idem sopra
+            m_scrollBar->setSliderPosition( m_scrollBar->sliderPosition() + m_scrollBar->pageStep() ); // Ditto as above
             return true;
         }
     }
-    // Per altri eventi: standard event processing
+    // Other events: standard event processing
     return QObject::eventFilter( obj, event );
 }
 
 ScrollBar::ScrollBar ( QTextEdit * parent ) :
     QScrollBar(parent),
     m_parent(parent),
-    m_textLineHeight(1), // Altezza di ogni riga, dipende dal font usato (anche se è sempre monospaced)
-    m_internalLineCount(1), // Quante righe ci sono nel documento realmente
+    m_textLineHeight(1), // Height of every line, it depends on the font used (although it's always monospaced)
+    m_internalLineCount(1), // How many lines are actually in the document
     m_sliderIsBeingDragged(false),
-    m_scrollAnim(this, "value"), // Un timer per una animazione di scorrimento più gradevole
-    m_pgKeyEater(this) // Un filtro tastiera per annullare il pageup/down e gestirlo internamente (è necessario poichè
-                       // altrimenti non si può evitare che il caret, che viene spostato con pagedown/up, cambi il
-                       // valore di dove punta la scrollbar e alla prossima animazione ci sia uno spostamento immediato
-                       // sbagliato)
+    m_scrollAnim(this, "value"), // A timer for a more pleasant scroll animation
+    m_pgKeyEater(this) // A keyboard filter to cancel the pageup/down and handle it internally (it is necessary since
+                       // otherwise there's no way to avoid the caret, moved with pagedown/up, changing the value where
+                       // the scrollbar points to and later causing an immediate wrong movement at the next animation)
 {
     Q_ASSERT( parent );
 
-    // WA_OpaquePaintEvent specifica che ridisegneremo il controllo ogni volta che ce n'è bisogno
-    // senza intervento del sistema. WA_NoSystemBackground invece evita che il sistema disegni
-    // il background (che comunque gestiremo noi)
+    // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without any system intervention.
+    // WA_NoSystemBackground avoids the system to draw the background (we'll handle it as well)
     setAttribute( Qt::WA_OpaquePaintEvent, false );
     setAttribute( Qt::WA_NoSystemBackground, true );
 
-    // L'unico modo per rilevare quando il line wrapping inserisce delle righe è tramite documentSizeChanged()
+    // Only way to detect when line wrapping inserts additional lines is through documentSizeChanged()
     connect( m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
             this, SLOT(documentSizeChanged(const QSizeF&)) );
-    // Handling dei segnali scroll mouse / page down-up / trascinamento (tracking)
+    // Handling signals scroll mouse / page down-up / dragging (tracking)
     connect(this, SIGNAL( actionTriggered(int)), this, SLOT(actionTriggered(int)));
     connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
 
-    // Installa il PageDown/PageUp key eater per il controllo parent
+    // Install PageDown/PageUp key eater for the parent control
     m_parent->installEventFilter( &m_pgKeyEater );
-    // Muove il caret alla fine dell'animazione di scroll (property pageStepEvent aiuta a non farlo per il mouse scroll)
+    // Move caret at the end of the scroll animation (pageStepEvent property helps not to move it for mouse scroll)
     connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
 }
 
@@ -68,7 +65,7 @@ ScrollBar::~ScrollBar() {
     m_parent->removeEventFilter(&m_pgKeyEater);
 }
 
-// Eventi di tracking (l'utente sta muovendo il caret a mano)
+// Tracking events (user is manually moving the slider)
 void ScrollBar::sliderReleased () {
     m_sliderIsBeingDragged = false;
 }
@@ -76,31 +73,31 @@ void ScrollBar::sliderPressed () {
     m_sliderIsBeingDragged = true;
 }
 
-// Sposta il caret (cursore) del parent alla posizione raggiunta dalla scrollbar. SOLTANTO quando l'animazione
-// è terminata (così non ci sono intoppi nella scorrevolezza). Utile quando è stato chiamato un PageUp/PageDown.
-// Un mousescroll non causa movimento del caret e quindi non viene gestito (pageStepEvent rimane 0 in quel caso)
+// Move the caret (cursor) of the parent to the position reached by the scrollbar. Do this ONLY WHEN animation has
+// terminated (so that the animation smoothness is not affected). Useful when a PageUp/PageDown was called.
+// A mousescroll won't cause caret's movement and thus it is not handled here (pageStepEvent remains 0 in that case)
 void ScrollBar::moveParentCaret() {
     int pageValue = m_scrollAnim.property("pageStepEvent").toInt();
-    if(pageValue > 0) { // PageDown o PageUp è stato premuto
+    if(pageValue > 0) { // PageDown or PageUp was pressed
         QTextCursor cursor = m_parent->textCursor();
-        // Riavvolge il cursore all'inizio del documento e poi lo posiziona alla riga dove doveva essere posizionato
+        // Rewind the cursor to the beginning of the document and then position it at the line it had to be positioned
         cursor.movePosition( QTextCursor::Start, QTextCursor::MoveAnchor );
         cursor.movePosition( QTextCursor::NextBlock, QTextCursor::MoveAnchor,
-                             value() / m_textLineHeight); // Ricorda che il valore dello slider è indice_riga * altezza_riga
+                             value() / m_textLineHeight ); // Recall that the slider's value is line_index * line_height
         m_parent->setTextCursor(cursor);
-        m_scrollAnim.setProperty("pageStepEvent", 0); // Aiuta a non resettare il caret per un mouse scroll (non serve)
+        m_scrollAnim.setProperty("pageStepEvent", 0); // Helps not to reset the caret for a mouse scroll (it isn't needed)
     }
 }
 
-// Slot invocato ogni volta che lo slider è mosso (scrolling, pageup/down, dragging (tracking))
-// Notare che:
+// This slot is invoked every time the slider is moved (scrolling, pageup/down, dragging(tracking))
+// Notice that:
 //   "When the signal is emitted, the sliderPosition has been adjusted according to the action, but the value has not
 //    yet been propagated (meaning the valueChanged() signal was not yet emitted)"
 void ScrollBar::actionTriggered ( int action ) {
-    if(action == QAbstractSlider::SliderNoAction || m_sliderIsBeingDragged) // Nessuna animazione in tracking
+    if(action == QAbstractSlider::SliderNoAction || m_sliderIsBeingDragged) // No animation in tracking
         return;
 
-    // Se una animazione è già in corso interrompila: i valori saranno aggiornati e una nuova animazione ripartirà
+    // If an animation is already in progress - interrupt it. Values will be updated and a new animation will start
     if(m_scrollAnim.state() == QAbstractAnimation::State::Running)
         m_scrollAnim.stop();
 
@@ -110,107 +107,107 @@ void ScrollBar::actionTriggered ( int action ) {
     m_scrollAnim.start();
 }
 
-// Quando il controllo viene resizato, si aggiorna anche il numero massimo di righe che possiamo visualizzare
-// entro la view
+// When the control is resized, the maximum number of lines we can display into the view is updated as well
 void ScrollBar::resizeEvent ( QResizeEvent * event ) {
    qDebug() << "TODO: resizeEvent per la ScrollBar, è utile il setMaximum qua? Se basta il docSizeChange rimuovilo";
    // setMaximum( m_internalLineCount * m_textLineHeight );
-    //qDebug() << "resizeEvent: maximum aggiornato a: " << maximum();
+    //qDebug() << "resizeEvent: maximum updated to: " << maximum();
     //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
     //qDebug() << "textLine.height() is  " << m_textLineHeight;
     QScrollBar::resizeEvent(event);
 }
 
-// Ogni volta che c'è un cambiamento nello slider (e.g. valore/range/orientamento/etc..) il numero di righe massime
-// deve essere ridimensionato per aggiungere delle righe "vuote" virtuali (leggi sotto)
+// Every time there's a change in the slider (e.g. value/range/orientation/etc..) the number of maximum lines
+// must be redimensioned to add some "empty" virtual lines (read below)
 void ScrollBar::sliderChange ( SliderChange change ) {
-    // Per poter simulare delle "righe vuote virtuali" alla fine e permettere di scrollare
-    // l'ultima riga fino all'inizio della view è necessario rilevare quando cambia il valore dello
-    // slider (e.g. sto scrollando o aggiungo/tolgo righe oppure wrappo) e aumentare il massimo dove si può scrollare.
-    // Non posso fare un semplice m_internalLineCount = (m_parent->document()->lineCount() - 1);
-    // perchè in wrap mode non è sempre valido e crea problemi
+    // To simulate some "empty virtual lines" at the bottom and allow to scroll the last line till the
+    // beginning of the view, it is necessary to detect when the slider value changes (e.g. I'm scrolling or
+    // adding/removing lines, or perhaps I'm wrapping) and increase the maximum the control can be scrolled to.
+    // This can't be as simple as doing m_internalLineCount = (m_parent->document()->lineCount() - 1);
+    // because in wrap mode this isn't always valid and might create problems. A full 'recalculate' has to be triggered.
     setMaximum( (m_internalLineCount - 1) * m_textLineHeight );
-    // qDebug() << "sliderValueChange dopo setMaximum ricevuto e value == " << value();
+    // qDebug() << "sliderValueChange after setMaximum received and set to == " << value();
     QAbstractSlider::sliderChange(change);
 }
 
-// Emesso quando il documento cambia size, è l'unico modo per rilevare il numero delle linee del documento con il wrapping
+// Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
 void ScrollBar::documentSizeChanged(const QSizeF & newSize) {
 
-    // Informazioni utili da sapere:
-    // - La gerarchia usata per trovare il parent QPlainTextEdit widget è:
-    //     QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
-    // - Se non inseriamo frames o tabelle, blocks == lines
-
-    // Calcola la height di una riga qualsiasi (la prima che è sempre presente)
+    // Useful information:
+    // - The hierarchy used to find the parent QPlainTextEdit widget is:
+    //   QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
+    // - If we don't insert frames or tables, blocks == lines
+    
+    // Calculate the height of a whatsoever line (the first is chosen since it is always present)
     QTextBlock block = m_parent->document()->findBlockByNumber( 0 );
-    QTextLayout *layout = block.layout(); // Layout di una riga
+    QTextLayout *layout = block.layout(); // Layout of a line
     QTextLine textLine = layout->lineAt( 0 );
     m_textLineHeight = textLine.height();
-    // Aggiorna il numero massimo di righe visibili nel controllo testo, questo può essere stato cambiato
+    // Update the maximum number of visible lines in the text control, this might have changed
     m_maxViewVisibleLines = qFloor( qreal( m_parent->height() ) / m_textLineHeight );
 
-    // Calcola il numero reale di righe del documento
+    // Calculate the real number of lines in the document
     m_internalLineCount = int( newSize.height() / m_textLineHeight );
-    // Aggiorna anche il maximum consentito per permettere di scrollare l'ultima riga fino all'inizio della view
+    // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     setMaximum( (m_internalLineCount - 1)* m_textLineHeight );
     // qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxViewVisibleLines << " m_internalLineCount "
     //   << m_internalLineCount;
 }
 
-// L'evento più importante del controllo: il repaint.
-// L'equazione fondamentale per il repainting è:
-//  lunghezza_dello_slider = altezza_massima_slider * (quante_righe_posso_visualizzare_nella_view / righe_totali_nel_documento)
+// The most important event in the control: repaint.
+// The fundamental equation to repaint the scrollbar is:
+//  slider_length = maximum_slider_height * (how_many_lines_I_can_display_in_the_view / total_number_of_lines_in_the_document)
 void ScrollBar::paintEvent ( QPaintEvent* ) {
 
     QPainter p( this );
 
     // >> ---------------------------------------------------------------------
-    //    Calcolo della posizione, lunghezza e area di disegno dello slider
+    //    Calculate the position, length and drawing area for the slider
     // --------------------------------------------------------------------  <<
 
-    // Le extraBottomLines sono righe virtuali per far scrollare l'ultima riga del testo fino a rimanere da sola in alto nella
-    // view. Quindi sono il numero massimo di righe che la view può visualizzare - 1 (esclusa la riga che voglio)
+    // extraBottomLines are virtual lines to let the last line of text be scrollable till it is left as the only one above in the view.
+    // Thus they correspond to the maximum number of lines that the view can visualize - 1 (the one I want is excluded)
     int extraBottomLines = (m_maxViewVisibleLines - 1);
 
-    // Dato che maximum() è SEMPRE maggiore di value() (il numero di linee del controllo è sempre
-    // maggiore o uguale della prima riga visualizzata dalla view), posso esprimere il rapporto come
-    //  posizione_iniziale_slider = altezza_view * (riga_dove_si_trova_la_view / max_righe_documento)
+    // Since maximum() is ALWAYS greater than value() (the number of lines in the control is always greater
+    // or equal to the line we're scrolled at), the position of the slider is:
+    //   slider_position = view_height * (line_where_the_view_is_scrolled / total_number_of_lines_in_the_document)
+    // in this case we calculate a "relative" position by using value() and maximum() which are relative to the control (not to the document)
     float viewRelativePos = float(m_maxViewVisibleLines) * (float(value()) / float(maximum() + (extraBottomLines*m_textLineHeight)));
 
-    // e ora trova la posizione assoluta nella rect del controllo, la proporzione è
+    // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
     float rectAbsPos = (float(rect().height()) * viewRelativePos) / float(m_maxViewVisibleLines);
 
     // qDebug() << "maxNumLines is " << maxNumLines << " and viewRelativePos is = " << viewRelativePos <<
     //            " rectAbsPos = " << rectAbsPos;
 
-    // e infine calcolo la lunghezza della rect dello slider includendo le extraBottomLines
+    // Calculate the length of the slider's rect including extraBottomLines
     int lenSlider = int( float(rect().height()) * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines)) );
 
-    // Imposta un minimo di lunghezza per lo slider (quando ci sono tantissime righe)
+    // Set a mimumim length for the slider (when there are LOTS of lines)
     if( lenSlider < 15 )
         lenSlider = 15;
 
-    // Evita che lo slider possa, per errori di roundoff, essere disegnato fuori dal rettangolo della scrollbar
+    // Prevents the slider to be drawn, due to roundoff errors, outside the scrollbar rectangle
     if( rectAbsPos + lenSlider > rect().height() )
         rectAbsPos -= ( rectAbsPos + lenSlider ) - rect().height();
 
-    // Questa è infine l'area di disegno per lo slider
+    // This is finally the drawing area for the slider
     QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
     // p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
 
 
     // >> ------------------------
-    //    Disegno dello slider
+    //       Slider drawing
     // -----------------------  <<
 
-    // Disegna una linea di separazione di 1 px
+    // A separation line of 1 px
     QPen lp( QColor( 29, 29, 29 ) );
     p.setPen(lp);
     p.drawLine( rect().left(), rect().top(), rect().left(), rect().bottom() );
 
-    // Leggero gradiente di sfondo da sx a dx
+    // Soft background gradient from sx to dx
     QLinearGradient bkGrad( rect().topLeft(), rect().topRight() );
     bkGrad.setColorAt( 0, QColor(33, 33, 33) );
     bkGrad.setColorAt( 1, QColor(50, 50, 50) );
@@ -218,25 +215,25 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
     rc.setLeft( rc.left()+1 );
     p.fillRect( rc, bkGrad );
 
-    // Disegno dello slider con un rounded-rectangle
-    // rcSlider è la hitbox, ma per il drawing ne prendiamo solo una sottosezione in larghezza
+    // Draws the slider with a rounded rectangle
+    // rcSlider is the hitbox, but to draw it we only take a width subsection
     QRect rcSliderSubsection( rcSlider);
     rcSliderSubsection.setX( rcSliderSubsection.x()+3 );
     rcSliderSubsection.setWidth( rcSliderSubsection.width()-2 );
     p.setRenderHint( QPainter::Antialiasing );
     QPainterPath path;
-    path.setFillRule( Qt::WindingFill ); // Riempimento per closed-shapes
+    path.setFillRule( Qt::WindingFill ); // Fill for closed-shapes
     path.addRoundedRect( rcSliderSubsection, 4, 4 );
 
-    // Seleziona un brush a gradiente per il riempimento dello slider
+    // Select a gradient brush to fill the slider
     QLinearGradient fillGrad( rect().topLeft(), rect().topRight() );
     fillGrad.setColorAt( 0, QColor(88, 88, 88) );
     fillGrad.setColorAt( 1, QColor(64, 64, 64) );
     QBrush gradFill( fillGrad );
     p.setBrush( gradFill );
 
-    // Disegna finalmente lo slider
-    p.drawPath( path.simplified() /* Unisce tutti gli eventuali segmenti e ottiene un solo path */ );
+    // Finally draw the slider
+    p.drawPath( path.simplified() /* Join any segments and obtain a single path */ );
 
-    // QScrollBar::paintEvent(event); // Nessun paintEvent della baseclass, abbiamo gestito completamente il ridisegno
+    // QScrollBar::paintEvent(event); // No base class paintEvent - we completely handled redrawing
 }

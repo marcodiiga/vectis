@@ -22,11 +22,11 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
     ui->setupUi(this);
 
-    // Crea il controllo code editor
+    // Create the code editor control
     m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
     ui->codeTextEditArea->addWidget(m_customCodeEdit.get());
 
-    qWarning() << "TODO: muovi lo stylesheet e il font setting DENTRO il controllo, non qui!";
+    qWarning() << "TODO: move stylesheet and font setting INSIDE the control, not here!";
     // Set background color for the edit code control
     m_customCodeEdit->setStyleSheet("QTextEdit {                                        \
                                      background-color: #272822;                         \
@@ -34,8 +34,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                      border: 0px;                                       \
                                      font-size: 12px;                                   \
                                      }");
-    // Consolas è installato di default su tutti i sistemi Windows, ma non linux.
-    // Il matching engine di Qt tenterà di trovare Consolas o un monospace di rimpiazzo
+    // Consolas is installed by default on every Windows system, but not linux.
+    // Qt's matching engine will try to find Consolas or a replacement monospace font
     // font-family: Consolas, monospace;
     QFont font("Consolas");
     font.setStyleHint(QFont::Monospace);
@@ -76,10 +76,10 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                                                     width:15px;\
                                                                   }"));
 
-    // Crea la TabsBar
+    // Create the TabsBar
     m_tabsBar = std::make_unique<TabsBar>(this);
-    //m_tabsBar->addTab("cazzo tab di prova");
-    //m_tabsBar->addTab("seconda tab");
+    //m_tabsBar->addTab("test tab");
+    //m_tabsBar->addTab("another tab");
     ui->tabsBarArea->addWidget(m_tabsBar.get());
 
 
