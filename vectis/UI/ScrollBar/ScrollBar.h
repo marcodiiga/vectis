@@ -6,15 +6,15 @@
 #include <QPropertyAnimation>
 
 class ScrollBar;
-// Questa classe si occupa di "mangiare" gli eventi PageUp/PageDown da parte del QTextEdit widget per
-// evitare il fastidioso interrompere dell'animazione da parte del caret mosso che modifica value()
+// This class "eats" PageUp/PageDown events from the QTextEdit widget to avoid interrupting the
+// animation due to the caret being moved that modifies value()
 class PgKeyEater : public QObject {
     Q_OBJECT
 
-    explicit PgKeyEater ( ScrollBar *scrollBar ); // Costruttore privato
+    explicit PgKeyEater ( ScrollBar *scrollBar ); // Private constructor
     ScrollBar *m_scrollBar;
 
-    friend class ScrollBar; // Solo la ScrollBar può costruire questo tipo di filtro
+    friend class ScrollBar; // Only ScrollBar can build this kind of filter
 protected:
     bool eventFilter ( QObject *obj, QEvent *event );
 };
@@ -31,18 +31,18 @@ private:
     void sliderChange ( SliderChange change );
 
     QTextEdit *m_parent;
-    int   m_maxViewVisibleLines; // Le righe che la view corrente del controllo testo può visualizzare
+    int   m_maxViewVisibleLines; // Lines that the current view of the text control can visualize
     qreal m_textLineHeight;
-    int   m_internalLineCount; // Le righe reali del controllo testo (non è moltiplicato per lineHeight)
+    int   m_internalLineCount; // Real lines of the text control (not multiplied by lineHeight)
     QPropertyAnimation m_scrollAnim;
     bool  m_sliderIsBeingDragged;
     PgKeyEater m_pgKeyEater;
 
-    friend class PgKeyEater; // Il filtro ha bisogno di accedere alla m_scrollAnim per indicare se alla fine
-                             // dell'animazione il caret dovrà essere spostato o meno (PgUp/Down soltanto)
+    friend class PgKeyEater; // Filter needs access to m_scrollAnim to indicate whether at the end of the
+                             // animation the caret will have to be moved (PageUp/Down only)
 
-private slots: // Per la documentazione per ogni singolo metodo consultare le rispettive definizioni,
-               // questi metodi non fanno parte di una interfaccia esterna
+private slots: // Consult the respective definitions for a thoroughly documentation of these methods,
+               // they're not part of an external interface
     void documentSizeChanged ( const QSizeF & newSize );
     void sliderPressed ();
     void sliderReleased ();
