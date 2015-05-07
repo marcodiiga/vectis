@@ -109,7 +109,7 @@ void ScrollBar::actionTriggered ( int action ) {
 
 // When the control is resized, the maximum number of lines we can display into the view is updated as well
 void ScrollBar::resizeEvent ( QResizeEvent * event ) {
-   qDebug() << "TODO: resizeEvent per la ScrollBar, è utile il setMaximum qua? Se basta il docSizeChange rimuovilo";
+   qDebug() << "TODO: resizeEvent for the ScrollBar, is it useful setMaximum here? If docSizeChange is enough, remove it";
    // setMaximum( m_internalLineCount * m_textLineHeight );
     //qDebug() << "resizeEvent: maximum updated to: " << maximum();
     //qDebug() << "m_maxNumLines is now " << m_maxNumLines;

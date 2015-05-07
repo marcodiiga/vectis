@@ -18,9 +18,20 @@ VMainWindow::VMainWindow(QWidget *parent) :
     this->setWindowFlags(flags);
     // Set the background color for window. Notice: style sheets are
     // more portable than modifying the palette directly
-    /* this->setStyleSheet("QDialog { background-color: #272822; }"); */
+    this->setStyleSheet("QDialog { background-color: #272822; }");
 
     ui->setupUi(this);
+
+
+
+    // Create the TabsBar
+    m_tabsBar = std::make_unique<TabsBar>(this);
+    //TabsBar ea;
+    m_tabsBar->setFixedHeight(35);
+    //m_tabsBar->addTab("test tab");
+    //m_tabsBar->addTab("another tab");
+    ui->codeTextEditArea->addWidget(m_tabsBar.get());
+
 
     // Create the code editor control
     m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
@@ -69,6 +80,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
                     width: 4px;\
                 }\
                 "));*/
+
+    // Create the vertical scrollbar and assign it to the code editor
     m_verticalScrollBar = std::make_unique<ScrollBar>(m_customCodeEdit.get());
     m_customCodeEdit->setVerticalScrollBar(m_verticalScrollBar.get());
     m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
@@ -76,11 +89,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                                                     width:15px;\
                                                                   }"));
 
-    // Create the TabsBar
-    m_tabsBar = std::make_unique<TabsBar>(this);
-    //m_tabsBar->addTab("test tab");
-    //m_tabsBar->addTab("another tab");
-    ui->tabsBarArea->addWidget(m_tabsBar.get());
+
 
 
 
