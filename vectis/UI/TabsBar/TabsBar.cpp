@@ -94,42 +94,16 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     p.setBrush( tabBrushFill );
     p.fillPath( tabPath, tabBrushFill );
 
-    p.setRenderHint(QPainter::SmoothPixmapTransform);
-    // Once filled the background, a gray border can be drawn above it and also a path attached to the first one
-    // looking like a black border translated 1px upper
-    const QPen grayPen( QColor(60, 61, 56) ), blackPen( QColor(11, 11, 10) ), intersectionPen( QColor(40,40,40) );
-    QPainterPath blackOuterTabPath = tabPath.translated(0, -1);
-    p.setPen( blackPen );
-    p.drawPath( blackOuterTabPath );
-
-    // Black outer border needs to fade out if there are background tabs, otherwise there's a too-strong distinction
-    p.setRenderHint( QPainter::Antialiasing, false );
-    p.setRenderHint( QPainter::HighQualityAntialiasing, false );
-    if( sxTabRect != 0 ) {
-        QPainterPath sxRemnant = blackOuterTabPath.intersected( *sxTabRect );
-        p.setPen( intersectionPen );
-        p.drawPath( sxRemnant );
-    }
-    if( dxTabRect != 0 ) {
-        QPainterPath dxRemnant = blackOuterTabPath.intersected( *dxTabRect );
-        p.setPen( intersectionPen );
-        p.drawPath( dxRemnant );
-    }
-    p.setPen( grayPen );
-    p.drawPath( tabPath );
-
-    if(selected == false) { // Unselected tabs have an additional nuanced shading on the bottom
-        p.setPen( QPen( QColor( 60,61,56 ) ) );
-        p.drawLine( tabRect.left() + tabRect.height() / 4, tabRect.bottom(),
-                    tabRect.right() - tabRect.height() / 4, tabRect.bottom() );
-    } else {
-        // Makes sure anti-aliasing problems are corrected
-        p.setPen( QPen( QColor( 60, 61, 56 ) ) );
-        p.drawLine( tabRect.left() - 2, tabRect.bottom() +1,
-                    tabRect.left(), tabRect.bottom() +1);
-        p.drawLine( tabRect.right(), tabRect.bottom() +1,
-                    tabRect.right() + 2, tabRect.bottom() +1);
-    }
+    p.setRenderHint(QPainter::HighQualityAntialiasing);
+    // Once filled the background, a gray border can be drawn above translated 1px upper
+    const QPen grayPen( QColor(60, 61, 56) );
+    const QPen darkerGrayPen ( QColor(50, 51, 46) );
+    QPainterPath grayOuterTabPath = tabPath.translated(0, -1);
+    if( selected == true )
+        p.setPen( grayPen );
+    else
+        p.setPen( darkerGrayPen );
+    p.drawPath( grayOuterTabPath );
 
     // Draw the tab's text in the subrectangle available
     if( selected == true )
