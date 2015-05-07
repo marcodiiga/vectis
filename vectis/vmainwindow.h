@@ -12,6 +12,15 @@ namespace Ui {
 class VMainWindow;
 }
 
+
+class tabTestFilter : public QObject { // DEBUG
+    Q_OBJECT
+public:
+    tabTestFilter () {}
+    TabsBar *ptr;
+    bool eventFilter ( QObject *obj, QEvent *event );
+}; // DEBUG
+
 class VMainWindow : public QDialog
 {
     Q_OBJECT
@@ -23,6 +32,7 @@ public:
     void paintEvent(QPaintEvent *);
     QPixmap editShot;
     bool shotSet;
+    tabTestFilter ttf; // DEBUG
 
 private slots:
 

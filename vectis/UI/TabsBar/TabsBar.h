@@ -20,6 +20,7 @@ public:
     // a rect and an offset. The equilibrium position has always offset zero.
     QRect m_rect;
     int m_offset = 0;
+    int m_verticalOffset = 0;
 };
 
 class TabsBar;
@@ -41,16 +42,32 @@ private slots:
     void animationHasFinished();
 };
 
+// This class implements a vertical interpolation for entering/exiting tabs
+class VerticalSlideAnimation: public QVariantAnimation {
+    Q_OBJECT
+public:
+    VerticalSlideAnimation( TabsBar& parent, size_t associatedTabIndex );
+
+    void updateCurrentValue(const QVariant &value) override;
+
+private:
+    TabsBar& m_parent;
+    size_t m_associatedTabIndex;
+};
+
 class TabsBar : public QWidget { // This class represents the entire control
     Q_OBJECT
 public:
     explicit TabsBar( QWidget *parent = 0 );
+    void insertTab(const QString text);
+
+private:
     QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "",
                                    const QPainterPath* sxTabRect = 0, const QPainterPath* dxTabRect = 0);
     void drawGrayHorizontalBar( QPainter& p, const QColor innerGrayCol );
-private:
 
     friend class SlideToPositionAnimation;
+    friend class VerticalSlideAnimation;
 
     void paintEvent ( QPaintEvent* );
     void mousePressEvent( QMouseEvent* evt );
@@ -70,6 +87,7 @@ private:
     std::vector<std::unique_ptr<SlideToPositionAnimation>> m_interpolators; // A vector of interpolators. QObjects aren't
                                                         // copyable due to memory management issues, thus it is necessary
                                                         // to use pointers to their memory to move them in different cells
+    std::vector<std::unique_ptr<VerticalSlideAnimation>> m_verticalInterpolators;
 };
 
 #endif // TABSBAR_H

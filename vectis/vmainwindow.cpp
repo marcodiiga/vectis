@@ -6,6 +6,9 @@
 
 #include <QDebug>
 
+
+
+
 VMainWindow::VMainWindow(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::VMainWindow)
@@ -89,11 +92,23 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                                                     width:15px;\
                                                                   }"));
 
-
-
+    // DEBUG CODE
+    ttf.ptr = m_tabsBar.get();
+    m_customCodeEdit->installEventFilter( &ttf );
 
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
+}
+
+bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) {
+    if ( event->type() == QEvent::KeyPress ) {
+        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
+        if( keyEvent->key() == Qt::Key_Plus ) {
+            ptr->insertTab("hello");
+        }
+    }
+    // Other events: standard event processing
+    return QObject::eventFilter( obj, event );
 }
 
 void VMainWindow::paintEvent(QPaintEvent *)

@@ -8,7 +8,8 @@
 
 TabsBar::TabsBar( QWidget *parent )
     : m_parent(parent),
-      m_draggingInProgress(false)
+      m_draggingInProgress(false),
+      m_selectedTabIndex(-1)
 {
     Q_ASSERT( parent );
 
@@ -26,24 +27,40 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
     // Tryouts here for tabs
 
-    // TODO: make a method "insertNewTab"
+//    // TODO: make a method "insertNewTab"
     m_tabs.push_back(Tab("First tab"));
     m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
 
     m_tabs.push_back(Tab("Second tab"));
     m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
 
     m_tabs.push_back(Tab("Third tab"));
     m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
 
     m_tabs.push_back(Tab("Fourth tab"));
     m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
 
-    //m_tabs.push_back(Tab());
-    //m_tabs.push_back(Tab());
-    //m_tabs.push_back(Tab());
+
+
     m_selectedTabIndex = 1;
     //DEBUG
+}
+
+void TabsBar::insertTab(const QString text) {
+    m_tabs.push_back(Tab(text));
+    size_t index = m_tabs.size()-1;
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, index));
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, index));
+    m_verticalInterpolators[index]->setDuration(100);
+    m_verticalInterpolators[index]->setStartValue(35);
+    m_verticalInterpolators[index]->setEndValue(0);
+    m_verticalInterpolators[index]->start();
+    m_selectedTabIndex = index;
+    repaint();
 }
 
 // Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
@@ -132,6 +149,7 @@ void TabsBar::drawGrayHorizontalBar( QPainter& p , const QColor innerGrayCol ) {
 }
 
 void TabsBar::paintEvent ( QPaintEvent* ) {
+
     Q_ASSERT( m_selectedTabIndex == -1 || // Nothing was selected or we're into a valid tab range
               ( m_selectedTabIndex != -1 && m_selectedTabIndex < m_tabs.size() ) );
 
@@ -189,6 +207,9 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             if(m_tabs[i].m_offset != 0) {
                 standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_offset);
             }
+            if(m_tabs[i].m_verticalOffset != 0) {
+                standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
+            }
             standardTabRect.setWidth( tabWidth );
 
             if(i == m_selectedTabIndex - 1) { // First tab doesn't need to be overlapped with anyone else
@@ -209,6 +230,9 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             // If we have a 'decreasing' offset, add it
             if(m_tabs[i].m_offset != 0) {
                 standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_offset);
+            }
+            if(m_tabs[i].m_verticalOffset != 0) {
+                standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
             }
             standardTabRect.setWidth( tabWidth );
             //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
@@ -237,6 +261,9 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             x += m_XTrackingDistance; // The tab must remain where we were dragging it
         } else if(m_tabs[m_selectedTabIndex].m_offset != 0) {
             x += m_tabs[m_selectedTabIndex].m_offset;
+        }
+        if(m_tabs[m_selectedTabIndex].m_verticalOffset != 0) {
+            standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex].m_verticalOffset);
         }
 //qDebug() << "x is " << x;
         standardTabRect.setX( x );
@@ -410,4 +437,24 @@ void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
 
 void SlideToPositionAnimation::animationHasFinished() {
     //m_parent.m_draggingInProgress = false;
+}
+
+VerticalSlideAnimation::VerticalSlideAnimation(TabsBar& parent, size_t associatedTabIndex ) :
+    m_parent(parent),
+    m_associatedTabIndex(associatedTabIndex)
+{
+}
+
+// This method is called at every variation of the interpolation value, it must make sure that
+// each tab's offset is updated
+void VerticalSlideAnimation::updateCurrentValue(const QVariant &value) {
+    // Aggiorna m_XTrackingDistance
+    //qDebug() << "updateCurrentValue(" << value.toInt() << ")";
+    //m_parent->m_XTrackingDistance = value.toInt();
+    //m_parent->repaint();
+
+    // Update the offset for the associated tab
+    m_parent.m_tabs[m_associatedTabIndex].m_verticalOffset = value.toInt();
+    // repaint?
+    m_parent.repaint();
 }
