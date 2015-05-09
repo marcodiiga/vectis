@@ -19,8 +19,8 @@ public:
     // To animate the "scroll towards the equilibrium position" effect, it is necessary having
     // a rect and an offset. The equilibrium position has always offset zero.
     QRect m_rect;
-    int m_offset = 0;
-    int m_verticalOffset = 0;
+    int m_Xoffset = 0;
+    int m_Yoffset = 0; // There is also a vertical offset for the entering/exiting tab animation
 };
 
 class TabsBar;
@@ -30,29 +30,17 @@ class TabsBar;
 class SlideToPositionAnimation: public QVariantAnimation {
     Q_OBJECT
 public:
-    SlideToPositionAnimation( TabsBar& parent, size_t associatedTabIndex );
+    SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex, bool isHorizontalOffset );
 
     void updateCurrentValue(const QVariant &value) override;
 
 private:
     TabsBar& m_parent;
     size_t m_associatedTabIndex;
+    bool m_isHorizontalOffset;
 
 private slots:
     void animationHasFinished();
-};
-
-// This class implements a vertical interpolation for entering/exiting tabs
-class VerticalSlideAnimation: public QVariantAnimation {
-    Q_OBJECT
-public:
-    VerticalSlideAnimation( TabsBar& parent, size_t associatedTabIndex );
-
-    void updateCurrentValue(const QVariant &value) override;
-
-private:
-    TabsBar& m_parent;
-    size_t m_associatedTabIndex;
 };
 
 class TabsBar : public QWidget { // This class represents the entire control
@@ -66,7 +54,6 @@ private:
     void drawGrayHorizontalBar( QPainter& p, const QColor innerGrayCol );
 
     friend class SlideToPositionAnimation;
-    friend class VerticalSlideAnimation;
 
     void paintEvent ( QPaintEvent* );
     void mousePressEvent( QMouseEvent* evt );
@@ -82,11 +69,11 @@ private:
     int m_selectionStartIndex;
     int m_XTrackingDistance; // Distance from the beginning of the tracking for a tab, negative or positive
     int tabWidth; // Half of this distance has to be surpassed to allow swapping a tab with another
-    //SlideToPositionAnimation m_slideAnimation;
-    std::vector<std::unique_ptr<SlideToPositionAnimation>> m_interpolators; // A vector of interpolators. QObjects aren't
-                                                        // copyable due to memory management issues, thus it is necessary
-                                                        // to use pointers to their memory to move them in different cells
-    std::vector<std::unique_ptr<VerticalSlideAnimation>> m_verticalInterpolators;
+
+    // Two horizontal and vertical vector of interpolators. QObjects aren't copyable due to memory management
+    // issues, thus it is necessary to use pointers to their memory to move them in different cells
+    std::vector<std::unique_ptr<SlideToPositionAnimation>> m_XInterpolators;
+    std::vector<std::unique_ptr<SlideToPositionAnimation>> m_YInterpolators;
 };
 
 #endif // TABSBAR_H

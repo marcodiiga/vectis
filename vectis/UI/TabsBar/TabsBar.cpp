@@ -29,21 +29,20 @@ TabsBar::TabsBar( QWidget *parent )
 
 //    // TODO: make a method "insertNewTab"
     m_tabs.push_back(Tab("First tab"));
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
 
     m_tabs.push_back(Tab("Second tab"));
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
 
     m_tabs.push_back(Tab("Third tab"));
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
 
     m_tabs.push_back(Tab("Fourth tab"));
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1));
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, m_tabs.size()-1));
-
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
 
 
     m_selectedTabIndex = 1;
@@ -54,16 +53,22 @@ TabsBar::TabsBar( QWidget *parent )
 void TabsBar::insertTab(const QString text) {
     m_tabs.emplace_back(text);
     int newTabIndex = static_cast<int>(m_tabs.size() - 1);
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex));
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, true));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, false));
 
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, newTabIndex));
-    m_verticalInterpolators[newTabIndex]->setDuration(100);
-    m_verticalInterpolators[newTabIndex]->setStartValue(35);
-    m_verticalInterpolators[newTabIndex]->setEndValue(0);
-    m_verticalInterpolators[newTabIndex]->start();
+    // Start a Y interpolator with a slide-in animation
+    m_YInterpolators[newTabIndex]->setDuration(100);
+    m_YInterpolators[newTabIndex]->setStartValue(35);
+    m_YInterpolators[newTabIndex]->setEndValue(0);
+    m_YInterpolators[newTabIndex]->start();
 
     m_selectedTabIndex = newTabIndex; // Also make it the new selected one
     repaint();
+}
+
+// Deletes a tab from the control by providing a "sliding" vertical animation
+void TabsBar::deleteTab(const QString text) {
+// TODO
 }
 
 // Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
@@ -208,14 +213,14 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
           x -= TAB_INTERSECTION_DELTA * i;
           standardTabRect.setX( x );
           // If we have a 'decreasing' offset, add it
-          if(m_tabs[i].m_offset != 0) {
+          if(m_tabs[i].m_Xoffset != 0) {
               if (leftTabs)
-                standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_offset);
+                standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_Xoffset);
               else
-                standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_offset);
+                standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_Xoffset);
           }
-          if(m_tabs[i].m_verticalOffset != 0) {
-              standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
+          if(m_tabs[i].m_Yoffset != 0) {
+              standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_Yoffset);
           }
           standardTabRect.setWidth( tabWidth );
 
@@ -253,11 +258,11 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         // Adjustment factors (negative or positive) in case we're being dragged
         if( m_draggingInProgress ) {
             x += m_XTrackingDistance; // The tab must remain where we were dragging it
-        } else if(m_tabs[m_selectedTabIndex].m_offset != 0) {
-            x += m_tabs[m_selectedTabIndex].m_offset;
+        } else if(m_tabs[m_selectedTabIndex].m_Xoffset != 0) {
+            x += m_tabs[m_selectedTabIndex].m_Xoffset;
         }
-        if(m_tabs[m_selectedTabIndex].m_verticalOffset != 0) {
-            standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex].m_verticalOffset);
+        if(m_tabs[m_selectedTabIndex].m_Yoffset != 0) {
+            standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex].m_Yoffset);
         }
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
@@ -346,13 +351,13 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
                 // Starts the interpolator for the swap of the other tab (it must come back to its equilibrium position)
                 int offset = tabWidth - TAB_INTERSECTION_DELTA;
-                m_tabs[m_selectedTabIndex].m_offset = offset; // Must go to zero
+                m_tabs[m_selectedTabIndex].m_Xoffset = offset; // Must go to zero
 
                 ++m_selectedTabIndex;
-                m_interpolators[m_selectedTabIndex-1]->setDuration(200);
-                m_interpolators[m_selectedTabIndex-1]->setStartValue(offset);
-                m_interpolators[m_selectedTabIndex-1]->setEndValue(0);
-                m_interpolators[m_selectedTabIndex-1]->start();
+                m_XInterpolators[m_selectedTabIndex-1]->setDuration(200);
+                m_XInterpolators[m_selectedTabIndex-1]->setStartValue(offset);
+                m_XInterpolators[m_selectedTabIndex-1]->setEndValue(0);
+                m_XInterpolators[m_selectedTabIndex-1]->start();
                 setUpdatesEnabled(true);
             }
         } else {
@@ -369,13 +374,13 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
                 // Starts the interpolator for the swap of the other tab (it must come back to its equilibrium position)
                 int offset = tabWidth - TAB_INTERSECTION_DELTA;
-                m_tabs[m_selectedTabIndex].m_offset = offset; // Must go to zero
+                m_tabs[m_selectedTabIndex].m_Xoffset = offset; // Must go to zero
 
                 --m_selectedTabIndex;
-                m_interpolators[m_selectedTabIndex+1]->setDuration(200);
-                m_interpolators[m_selectedTabIndex+1]->setStartValue(offset);
-                m_interpolators[m_selectedTabIndex+1]->setEndValue(0);
-                m_interpolators[m_selectedTabIndex+1]->start();
+                m_XInterpolators[m_selectedTabIndex+1]->setDuration(200);
+                m_XInterpolators[m_selectedTabIndex+1]->setStartValue(offset);
+                m_XInterpolators[m_selectedTabIndex+1]->setEndValue(0);
+                m_XInterpolators[m_selectedTabIndex+1]->start();
                 setUpdatesEnabled(true);
         }
     }
@@ -393,20 +398,21 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
     qDebug() << "Tracking ended";
 
     // Animate the "return" to the correct position, i.e. decreases the XTrackingDistance to zero
-    m_tabs[m_selectedTabIndex].m_offset = m_XTrackingDistance; // Must go to zero
-    m_interpolators[m_selectedTabIndex]->setDuration(200);
-    m_interpolators[m_selectedTabIndex]->setStartValue(m_XTrackingDistance);
-    m_interpolators[m_selectedTabIndex]->setEndValue(0);
-    m_interpolators[m_selectedTabIndex]->start();
+    m_tabs[m_selectedTabIndex].m_Xoffset = m_XTrackingDistance; // Must go to zero
+    m_XInterpolators[m_selectedTabIndex]->setDuration(200);
+    m_XInterpolators[m_selectedTabIndex]->setStartValue(m_XTrackingDistance);
+    m_XInterpolators[m_selectedTabIndex]->setEndValue(0);
+    m_XInterpolators[m_selectedTabIndex]->start();
 
     m_draggingInProgress = false;
 }
 
 
 
-SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex ) :
+SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex , bool isHorizontalOffset) :
     m_parent(parent),
-    m_associatedTabIndex(associatedTabIndex)
+    m_associatedTabIndex(associatedTabIndex),
+    m_isHorizontalOffset(isHorizontalOffset)
 {
     connect(this, SIGNAL(finished()), SLOT(animationHasFinished()));
 }
@@ -414,37 +420,16 @@ SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, size_t assoc
 // This method is called at every variation of the interpolation value, it must make sure that
 // each tab's offset is updated
 void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
-    // Aggiorna m_XTrackingDistance
-    //qDebug() << "updateCurrentValue(" << value.toInt() << ")";
-    //m_parent->m_XTrackingDistance = value.toInt();
-    //m_parent->repaint();
 
-    // Update the offset for the associated tab
-    m_parent.m_tabs[m_associatedTabIndex].m_offset = value.toInt();
-    // repaint?
+    // Update the offset for the associated tab (either vertical or horizontal)
+    if (m_isHorizontalOffset)
+        m_parent.m_tabs[m_associatedTabIndex].m_Xoffset = value.toInt();
+    else
+        m_parent.m_tabs[m_associatedTabIndex].m_Yoffset = value.toInt();
+
     m_parent.repaint();
 }
 
 void SlideToPositionAnimation::animationHasFinished() {
     //m_parent.m_draggingInProgress = false;
-}
-
-VerticalSlideAnimation::VerticalSlideAnimation(TabsBar& parent, size_t associatedTabIndex ) :
-    m_parent(parent),
-    m_associatedTabIndex(associatedTabIndex)
-{
-}
-
-// This method is called at every variation of the interpolation value, it must make sure that
-// each tab's offset is updated
-void VerticalSlideAnimation::updateCurrentValue(const QVariant &value) {
-    // Aggiorna m_XTrackingDistance
-    //qDebug() << "updateCurrentValue(" << value.toInt() << ")";
-    //m_parent->m_XTrackingDistance = value.toInt();
-    //m_parent->repaint();
-
-    // Update the offset for the associated tab
-    m_parent.m_tabs[m_associatedTabIndex].m_verticalOffset = value.toInt();
-    // repaint?
-    m_parent.repaint();
 }
