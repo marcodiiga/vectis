@@ -50,23 +50,25 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
 }
 
+// Dynamically inserts a tab into the control by providing a "sliding" vertical animation
 void TabsBar::insertTab(const QString text) {
-    m_tabs.push_back(Tab(text));
-    size_t index = m_tabs.size()-1;
-    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, index));
-    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, index));
-    m_verticalInterpolators[index]->setDuration(100);
-    m_verticalInterpolators[index]->setStartValue(35);
-    m_verticalInterpolators[index]->setEndValue(0);
-    m_verticalInterpolators[index]->start();
-    m_selectedTabIndex = index;
+    m_tabs.emplace_back(text);
+    int newTabIndex = static_cast<int>(m_tabs.size() - 1);
+    m_interpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex));
+
+    m_verticalInterpolators.emplace_back(std::make_unique<VerticalSlideAnimation>(*this, newTabIndex));
+    m_verticalInterpolators[newTabIndex]->setDuration(100);
+    m_verticalInterpolators[newTabIndex]->setStartValue(35);
+    m_verticalInterpolators[newTabIndex]->setEndValue(0);
+    m_verticalInterpolators[newTabIndex]->start();
+
+    m_selectedTabIndex = newTabIndex; // Also make it the new selected one
     repaint();
 }
 
 // Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
 // look by adding a nuance
-QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text,
-                                         const QPainterPath* sxTabRect, const QPainterPath* dxTabRect ) {
+QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text) {
     // Decide colors for a selected or unselected tab
     QColor topGradientColor, bottomGradientColor;
     if( selected == false ) { // Unselected
@@ -197,58 +199,50 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
     QRect standardTabRect( 5, 5, tabWidth /* Width */, tabHeight );
 
     if( m_selectedTabIndex != -1 ) {
-        // Draw tabs left of the selected one first (if there's any)
+
         QPainterPath temp, leftOfSelected, rightOfSelected;
-        for( int i = m_selectedTabIndex - 1; i >= 0; --i ) {
-            int x = 5 + i * tabWidth;
-            x -= TAB_INTERSECTION_DELTA * i;
-            standardTabRect.setX( x );
-            // If we have a 'decreasing' offset, add it
-            if(m_tabs[i].m_offset != 0) {
+        // This lambda takes care of calculating the right rect position for a tab with a given index
+        // and of calling the drawing function
+        auto calculatePositionAndDrawTab = [&](int i, bool leftTabs) {
+          int x = 5 + i * tabWidth;
+          x -= TAB_INTERSECTION_DELTA * i;
+          standardTabRect.setX( x );
+          // If we have a 'decreasing' offset, add it
+          if(m_tabs[i].m_offset != 0) {
+              if (leftTabs)
                 standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_offset);
-            }
-            if(m_tabs[i].m_verticalOffset != 0) {
-                standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
-            }
-            standardTabRect.setWidth( tabWidth );
-
-            if(i == m_selectedTabIndex - 1) { // First tab doesn't need to be overlapped with anyone else
-                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
-                leftOfSelected = temp;
-            }
-            else
-                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title, &temp );
-            m_tabs[i].m_region = temp;
-            //p.setPen(QColor(255 - i*20,0,0));
-            //p.drawRect(standardTabRect);
-        }
-        // Draw tabs right of the selected one (if there's any)
-        for( int i = (int)m_tabs.size()-1; i > m_selectedTabIndex; --i ) {
-            int x = 5 + i * tabWidth;
-            x -= TAB_INTERSECTION_DELTA * i;
-            standardTabRect.setX( x );
-            // If we have a 'decreasing' offset, add it
-            if(m_tabs[i].m_offset != 0) {
+              else
                 standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_offset);
-            }
-            if(m_tabs[i].m_verticalOffset != 0) {
-                standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
-            }
-            standardTabRect.setWidth( tabWidth );
-            //qDebug() << standardTabRect.x() << "," << standardTabRect.y() << "," <<
-            //            standardTabRect.width() << "," << standardTabRect.height();
+          }
+          if(m_tabs[i].m_verticalOffset != 0) {
+              standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_verticalOffset);
+          }
+          standardTabRect.setWidth( tabWidth );
 
-            if(i == m_tabs.size()-1) // First tab doesn't need to be overlapped with anyone else
-                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
-            else
-                temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title, &temp );
-            if( i == m_selectedTabIndex+1 )
+          temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
+
+          if (leftTabs) {
+              if(i == m_selectedTabIndex - 1)
+                  leftOfSelected = temp;
+          } else {
+              if(i == m_selectedTabIndex + 1)
                 rightOfSelected = temp;
-            m_tabs[i].m_region = temp;
-            //m_tabs[i].m_rect = standardTabRect;
-            //p.setPen(QColor(255 - i*20,0,0));
-            //p.drawRect(standardTabRect);
-        }
+          }
+
+          m_tabs[i].m_region = temp;
+
+          // Debug code to visualize tab rects
+          //p.setPen(QColor(255 - i*20,0,0));
+          //p.drawRect(standardTabRect);
+        };
+
+        // Draw tabs at the left of the selected one
+        for( int i = m_selectedTabIndex - 1; i >= 0; --i )
+            calculatePositionAndDrawTab(i, true);
+
+        // Draw tabs at the right of the selected one
+        for( int i = (int)m_tabs.size()-1; i > m_selectedTabIndex; --i )
+            calculatePositionAndDrawTab(i, false);
 
         drawGrayHorizontalBar( p, innerGrayCol );
 
@@ -265,15 +259,11 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         if(m_tabs[m_selectedTabIndex].m_verticalOffset != 0) {
             standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex].m_verticalOffset);
         }
-//qDebug() << "x is " << x;
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
-        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex].m_title,
-                          (m_selectedTabIndex > 0 ? &leftOfSelected : 0),
-                          (m_selectedTabIndex < m_tabs.size()-1 ? &rightOfSelected : 0) );
+
+        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex].m_title);
         m_tabs[m_selectedTabIndex].m_rect = standardTabRect;
-        //p.setPen(QColor(255 - 5*20,0,0));
-        //p.drawRect(standardTabRect);
     }
 }
 

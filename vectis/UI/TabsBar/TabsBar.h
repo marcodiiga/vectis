@@ -62,8 +62,7 @@ public:
     void insertTab(const QString text);
 
 private:
-    QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "",
-                                   const QPainterPath* sxTabRect = 0, const QPainterPath* dxTabRect = 0);
+    QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "");
     void drawGrayHorizontalBar( QPainter& p, const QColor innerGrayCol );
 
     friend class SlideToPositionAnimation;
