@@ -27,22 +27,10 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
     // Tryouts here for tabs
 
-//    // TODO: make a method "insertNewTab"
-    m_tabs.push_back(Tab("First tab"));
-    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
-    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
+    insertTab("First tab", false);
+    insertTab("Sec tab", false);
+    insertTab("Third tab", false);
 
-    m_tabs.push_back(Tab("Second tab"));
-    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
-    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
-
-    m_tabs.push_back(Tab("Third tab"));
-    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
-    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
-
-    m_tabs.push_back(Tab("Fourth tab"));
-    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, true));
-    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, m_tabs.size()-1, false));
 
 
     m_selectedTabIndex = 1;
@@ -50,25 +38,119 @@ TabsBar::TabsBar( QWidget *parent )
 }
 
 // Dynamically inserts a tab into the control by providing a "sliding" vertical animation
-void TabsBar::insertTab(const QString text) {
-    m_tabs.emplace_back(text);
+int TabsBar::insertTab(const QString text, bool animation) {
+    // Create the tab object and its interpolators
+    m_tabs.emplace_back(std::make_unique<Tab>(text, Tab::private_access()));
     int newTabIndex = static_cast<int>(m_tabs.size() - 1);
-    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, true));
-    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, false));
+    m_XInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, true,
+                                                                             SlideToPositionAnimation::private_access()));
+    m_YInterpolators.emplace_back(std::make_unique<SlideToPositionAnimation>(*this, newTabIndex, false,
+                                                                             SlideToPositionAnimation::private_access()));
 
-    // Start a Y interpolator with a slide-in animation
-    m_YInterpolators[newTabIndex]->setDuration(100);
-    m_YInterpolators[newTabIndex]->setStartValue(35);
-    m_YInterpolators[newTabIndex]->setEndValue(0);
-    m_YInterpolators[newTabIndex]->start();
+    // Assign a free id to the tab (this is not the tab index in the control)
+    auto getFreeIdFromPool = [&](int tabIndex) {
+      if (m_tabIdHoles.begin() != m_tabIdHoles.end()) { // If there's a hole in the pool set, grab it and fill it
+        int id = *m_tabIdHoles.begin();
+        m_tabIdHoles.erase(m_tabIdHoles.begin());
+        m_tabId2tabIndexMap[id] = tabIndex;
+        return id;
+      } else { // else simply grab the next free id
+        int id = static_cast<int>(m_tabId2tabIndexMap.size());
+        m_tabId2tabIndexMap[id] = tabIndex;
+        return id;
+      }
+    };
+    int newId = getFreeIdFromPool(newTabIndex);
+    m_tabs[newTabIndex]->m_uniqueId = newId;
+
+    // If asked, start a Y interpolator with a slide-in animation
+    if (animation) {
+      m_YInterpolators[newTabIndex]->setDuration(100);
+      m_YInterpolators[newTabIndex]->setStartValue(35);
+      m_YInterpolators[newTabIndex]->setEndValue(0);
+      m_YInterpolators[newTabIndex]->start();
+    }
 
     m_selectedTabIndex = newTabIndex; // Also make it the new selected one
     repaint();
+
+    return newId;
 }
 
 // Deletes a tab from the control by providing a "sliding" vertical animation
-void TabsBar::deleteTab(const QString text) {
-// TODO
+void TabsBar::deleteTab(int id, bool animation) {
+  if(m_tabs.size() == 0)
+    return; // No tabs to delete
+
+  auto tabIdMapIterator = m_tabId2tabIndexMap.find(id);
+  bool validId = tabIdMapIterator != m_tabId2tabIndexMap.end();
+  Q_ASSERT(validId == true);
+
+  int deleteTabIndex = tabIdMapIterator->second;
+  int deleteTabId = id;
+
+  // Create a deletion callback to be executed only when the animation has finished
+  auto deletionCallback = [=] (TabsBar& tabsBar) {
+
+    int delTabId = deleteTabId;
+    int delTabIndex = deleteTabIndex; // Avoid MSVC problems with lambda value capture
+
+    // Actually delete tab and interpolators
+    tabsBar.m_XInterpolators.erase(tabsBar.m_XInterpolators.begin() + delTabIndex);
+    tabsBar.m_YInterpolators.erase(tabsBar.m_YInterpolators.begin() + delTabIndex);
+    tabsBar.m_tabs.erase(tabsBar.m_tabs.begin() + delTabIndex);
+
+    // Updates all right interpolators to refer to the right position in the tabs vector and
+    // updates all right tabs in the tabId2tabIndex map
+    for (int i=delTabIndex; i<tabsBar.m_tabs.size(); ++i) {
+      tabsBar.m_XInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
+      tabsBar.m_YInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
+      tabsBar.m_tabId2tabIndexMap[tabsBar.m_tabs[i]->getTabId()] = i;
+    }
+
+    // Release the tab id and put it into the holes vector (to be grabbed the next time)
+    tabsBar.m_tabIdHoles.insert(delTabId);
+
+    // If this was the selected tab, make sure to have another selected before repainting
+    if (tabsBar.m_selectedTabIndex == delTabIndex) {
+      if (tabsBar.m_tabs.size() == 0)
+        tabsBar.m_selectedTabIndex = -1; // We deleted the only one in the control
+      else { // Find a selection substitute
+        // Just leave the id as it was if there was a right tab (it will take our selection)
+        // (in case m_selectedTabIndex < m_tabs.size()), otherwise grab the leftmost one
+        if (tabsBar.m_selectedTabIndex >= tabsBar.m_tabs.size())
+          tabsBar.m_selectedTabIndex = static_cast<int>(tabsBar.m_tabs.size()) - 1;
+      }
+      // TODO: RELOAD DOCUMENT EVENT HERE
+    } else { // Keep the selected one active
+      // TODO: NO RELOAD DOCUMENT EVENT HERE
+      if (delTabIndex  < tabsBar.m_selectedTabIndex)
+        tabsBar.m_selectedTabIndex--;
+      // No need to do anything if it was on the right
+    }
+
+    tabsBar.repaint();
+  };
+
+  if (animation == true) {
+    // Start a Y interpolator with a slide-out animation and set a finish callback
+    m_YInterpolators[deleteTabIndex]->finishCallback = deletionCallback;
+    m_YInterpolators[deleteTabIndex]->setDuration(150);
+    m_YInterpolators[deleteTabIndex]->setStartValue(0);
+    m_YInterpolators[deleteTabIndex]->setEndValue(35);
+    m_YInterpolators[deleteTabIndex]->start();
+  } else {
+    deletionCallback(*this); // Just call the callback
+    repaint();
+  }
+}
+
+// Returns the selected tab id (NOT index) - users only deal with unique ids
+int TabsBar::getSelectedTabId () {
+  if (m_selectedTabIndex != -1)
+    return m_tabs[m_selectedTabIndex]->getTabId();
+  else
+    return -1;
 }
 
 // Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
@@ -213,18 +295,18 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
           x -= TAB_INTERSECTION_DELTA * i;
           standardTabRect.setX( x );
           // If we have a 'decreasing' offset, add it
-          if(m_tabs[i].m_Xoffset != 0) {
+          if(m_tabs[i]->m_Xoffset != 0) {
               if (leftTabs)
-                standardTabRect.setX(standardTabRect.x() + m_tabs[i].m_Xoffset);
+                standardTabRect.setX(standardTabRect.x() + m_tabs[i]->m_Xoffset);
               else
-                standardTabRect.setX(standardTabRect.x() - m_tabs[i].m_Xoffset);
+                standardTabRect.setX(standardTabRect.x() - m_tabs[i]->m_Xoffset);
           }
-          if(m_tabs[i].m_Yoffset != 0) {
-              standardTabRect.setY(standardTabRect.y() + m_tabs[i].m_Yoffset);
+          if(m_tabs[i]->m_Yoffset != 0) {
+              standardTabRect.setY(standardTabRect.y() + m_tabs[i]->m_Yoffset);
           }
           standardTabRect.setWidth( tabWidth );
 
-          temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i].m_title );
+          temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i]->m_title );
 
           if (leftTabs) {
               if(i == m_selectedTabIndex - 1)
@@ -234,7 +316,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
                 rightOfSelected = temp;
           }
 
-          m_tabs[i].m_region = temp;
+          m_tabs[i]->m_region = temp;
 
           // Debug code to visualize tab rects
           //p.setPen(QColor(255 - i*20,0,0));
@@ -258,17 +340,17 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         // Adjustment factors (negative or positive) in case we're being dragged
         if( m_draggingInProgress ) {
             x += m_XTrackingDistance; // The tab must remain where we were dragging it
-        } else if(m_tabs[m_selectedTabIndex].m_Xoffset != 0) {
-            x += m_tabs[m_selectedTabIndex].m_Xoffset;
+        } else if(m_tabs[m_selectedTabIndex]->m_Xoffset != 0) {
+            x += m_tabs[m_selectedTabIndex]->m_Xoffset;
         }
-        if(m_tabs[m_selectedTabIndex].m_Yoffset != 0) {
-            standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex].m_Yoffset);
+        if(m_tabs[m_selectedTabIndex]->m_Yoffset != 0) {
+            standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex]->m_Yoffset);
         }
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
 
-        m_tabs[m_selectedTabIndex].m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex].m_title);
-        m_tabs[m_selectedTabIndex].m_rect = standardTabRect;
+        m_tabs[m_selectedTabIndex]->m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex]->m_title);
+        m_tabs[m_selectedTabIndex]->m_rect = standardTabRect;
     }
 }
 
@@ -278,7 +360,7 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
         m_dragStartPosition = evt->pos();
         m_selectionStartIndex = m_selectedTabIndex;
         for( size_t i=0; i<m_tabs.size(); ++i ) {
-            if(m_tabs[i].m_region.contains(m_dragStartPosition) == true) {
+            if(m_tabs[i]->m_region.contains(m_dragStartPosition) == true) {
                 m_selectedTabIndex = (int)i;
                 repaint();
                 // TODO: send a signal "changedSelectedTab" with the integer 'm_selectedTabIndex'
@@ -325,7 +407,9 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
                                             // movement interpolator set
 
                 //qDebug() << "Swap current tab (index: " << m_selectedTabIndex << ") with tab index: " << m_selectedTabIndex+1;
-                std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex+1]);
+                m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex]->getTabId()] = m_selectedTabIndex+1;
+                m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex+1]->getTabId()] = m_selectedTabIndex;
+                std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex+1]);                
                 //qDebug() << m_tabs[m_selectedTabIndex].m_rect;
                 //qDebug() << m_tabs[m_selectedTabIndex+1].m_rect;
 
@@ -351,7 +435,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
                 // Starts the interpolator for the swap of the other tab (it must come back to its equilibrium position)
                 int offset = tabWidth - TAB_INTERSECTION_DELTA;
-                m_tabs[m_selectedTabIndex].m_Xoffset = offset; // Must go to zero
+                m_tabs[m_selectedTabIndex]->m_Xoffset = offset; // Must go to zero
 
                 ++m_selectedTabIndex;
                 m_XInterpolators[m_selectedTabIndex-1]->setDuration(200);
@@ -366,6 +450,8 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
                 setUpdatesEnabled(false);   // Disable paint() events UNTIL all updates are finished & the 'dethroned' tab has its
                                             // movement interpolator set
                 //qDebug() << "Swap current tab (index: " << m_selectedTabIndex << ") with tab index: " << m_selectedTabIndex-1;
+                m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex]->getTabId()] = m_selectedTabIndex-1;
+                m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex-1]->getTabId()] = m_selectedTabIndex;
                 std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex-1]);
 
                 // Same reasoning (inverted) as the case above
@@ -374,7 +460,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
                 // Starts the interpolator for the swap of the other tab (it must come back to its equilibrium position)
                 int offset = tabWidth - TAB_INTERSECTION_DELTA;
-                m_tabs[m_selectedTabIndex].m_Xoffset = offset; // Must go to zero
+                m_tabs[m_selectedTabIndex]->m_Xoffset = offset; // Must go to zero
 
                 --m_selectedTabIndex;
                 m_XInterpolators[m_selectedTabIndex+1]->setDuration(200);
@@ -391,14 +477,14 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 }
 
 // Signal the end of a tracking event
-void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
+void TabsBar::mouseReleaseEvent(QMouseEvent *) {
     if( m_draggingInProgress == false )
         return;
 
     qDebug() << "Tracking ended";
 
     // Animate the "return" to the correct position, i.e. decreases the XTrackingDistance to zero
-    m_tabs[m_selectedTabIndex].m_Xoffset = m_XTrackingDistance; // Must go to zero
+    m_tabs[m_selectedTabIndex]->m_Xoffset = m_XTrackingDistance; // Must go to zero
     m_XInterpolators[m_selectedTabIndex]->setDuration(200);
     m_XInterpolators[m_selectedTabIndex]->setStartValue(m_XTrackingDistance);
     m_XInterpolators[m_selectedTabIndex]->setEndValue(0);
@@ -409,7 +495,7 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *evt) {
 
 
 
-SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex , bool isHorizontalOffset) :
+SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, int associatedTabIndex , bool isHorizontalOffset) :
     m_parent(parent),
     m_associatedTabIndex(associatedTabIndex),
     m_isHorizontalOffset(isHorizontalOffset)
@@ -423,13 +509,14 @@ void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
 
     // Update the offset for the associated tab (either vertical or horizontal)
     if (m_isHorizontalOffset)
-        m_parent.m_tabs[m_associatedTabIndex].m_Xoffset = value.toInt();
+        m_parent.m_tabs[m_associatedTabIndex]->m_Xoffset = value.toInt();
     else
-        m_parent.m_tabs[m_associatedTabIndex].m_Yoffset = value.toInt();
+        m_parent.m_tabs[m_associatedTabIndex]->m_Yoffset = value.toInt();
 
     m_parent.repaint();
 }
 
 void SlideToPositionAnimation::animationHasFinished() {
-    //m_parent.m_draggingInProgress = false;
+    if (finishCallback) // operator(bool) indicates if this is a callable function
+      finishCallback (m_parent);
 }

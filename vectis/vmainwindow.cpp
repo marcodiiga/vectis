@@ -100,11 +100,13 @@ VMainWindow::VMainWindow(QWidget *parent) :
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
 
-bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) {
+bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) { // DEBUG EVENT FILTER
     if ( event->type() == QEvent::KeyPress ) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
         if( keyEvent->key() == Qt::Key_Plus ) {
             ptr->insertTab("hello");
+        } else if( keyEvent->key() == Qt::Key_Minus ) {
+          ptr->deleteTab(ptr->getSelectedTabId());
         }
     }
     // Other events: standard event processing

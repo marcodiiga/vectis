@@ -5,16 +5,65 @@
 #include <QMouseEvent>
 #include <QVariantAnimation>
 #include <memory>
+#include <functional>
+#include <set>
 
 #define TAB_MAXIMUM_WIDTH 150
 #define TAB_INTERSECTION_DELTA 20
 
+class TabsBar;
+class SlideToPositionAnimation;
+
 class Tab { // This class represents a tab in the control
 public:
+
+    int getTabId() {
+      return m_uniqueId;
+    }
+
+private:
+
+    // Why are we using delegate constructors and declaring a private_access inner structure?
+    //
+    // We want to have Tab's private constructor accessible only to TabsBar and interpolators
+    // but we also want to be able to construct objects in-place from TabsBar with
+    //   tabs_vector.emplace_back("I'm a new tab");
+    // The problem with the approach above is: emplace_back delegates construction of the
+    // Tab object to std::allocator (construct()) and this is not a friend of Tab.
+    //
+    // To workaround this issue we can either supply a custom TabAllocator which, being an inner class,
+    // as of [class.access.nest]/p1
+    //
+    //   "A nested class is a member and as such has the same access rights as any other member."
+    //
+    // would allow TabsBar to emplace_back Tabs by using the custom member allocator provided.
+    //
+    // Unfortunately this doesn't work on MSVC and thus we need a plan B: a public constructor
+    //  Tab(Qstring, const private_access&)
+    // that, since requires a private_access structure (privately declared), can only be called by
+    // a friend class. Since the constructor (called by the allocator) then delegates the actual object
+    // construction to another constructor (C++11 and above only), this will ensure there will be no
+    // access problems.
+
+    friend class TabsBar;
+    friend class SlideToPositionAnimation;
+
     Tab(QString title) : m_title(title) {}
+
+    struct private_access {};
+
+public:
+    Tab (QString title, const private_access&) : // Only accessible to friend classes
+      Tab(title)
+    {}
+private:
 
     QString m_title;
     QPainterPath m_region;
+
+    // Every tab is referred to with a unique id. Notice: this must *NOT* be confused with the
+    // tab's index into the tab control (i.e. its position into the control)
+    int m_uniqueId;
 
     // To animate the "scroll towards the equilibrium position" effect, it is necessary having
     // a rect and an offset. The equilibrium position has always offset zero.
@@ -23,21 +72,27 @@ public:
     int m_Yoffset = 0; // There is also a vertical offset for the entering/exiting tab animation
 };
 
-class TabsBar;
-
 // This class implements an interpolation towards the tabs equilibrium positions, i.e. the
 // fluid scrolling effect
 class SlideToPositionAnimation: public QVariantAnimation {
     Q_OBJECT
-public:
-    SlideToPositionAnimation(TabsBar& parent, size_t associatedTabIndex, bool isHorizontalOffset );
 
+    SlideToPositionAnimation(TabsBar& parent, int associatedTabIndex, bool isHorizontalOffset );
+    struct private_access {};
+public:
+    SlideToPositionAnimation (TabsBar& parent, int associatedTabIndex, bool isHorizontalOffset,
+                              const private_access&) : // Only accessible to friend classes
+      SlideToPositionAnimation(parent, associatedTabIndex, isHorizontalOffset)
+    {}
+private:
+
+    friend class TabsBar;
     void updateCurrentValue(const QVariant &value) override;
 
-private:
     TabsBar& m_parent;
-    size_t m_associatedTabIndex;
+    int m_associatedTabIndex;
     bool m_isHorizontalOffset;
+    std::function<void(TabsBar&)> finishCallback;
 
 private slots:
     void animationHasFinished();
@@ -47,7 +102,9 @@ class TabsBar : public QWidget { // This class represents the entire control
     Q_OBJECT
 public:
     explicit TabsBar( QWidget *parent = 0 );
-    void insertTab(const QString text);
+    int insertTab(const QString text, bool animation = true);
+    void deleteTab(int id, bool animation = true);
+    int getSelectedTabId();
 
 private:
     QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "");
@@ -58,11 +115,18 @@ private:
     void paintEvent ( QPaintEvent* );
     void mousePressEvent( QMouseEvent* evt );
     void mouseMoveEvent( QMouseEvent* evt );
-    void mouseReleaseEvent( QMouseEvent* evt );
+    void mouseReleaseEvent(QMouseEvent*);
 
     QWidget *m_parent;
-    std::vector<Tab> m_tabs; // The tabs vector
+    std::vector<std::unique_ptr<Tab>> m_tabs; // The tabs vector
     int m_selectedTabIndex; // Index of selected tab. -1 means "no one"
+
+    // Nb. there are two different kind of indices:
+    //  - Tab id -> this is unique for every tab and can never change
+    //  - Tab index -> this is the position of the tab in the control vector and might be change (swap)
+    // Users only deal with tab ids
+    std::map<int, int> m_tabId2tabIndexMap; // The tab_id->control_position_index map for the tabs
+    std::set<int> m_tabIdHoles; // The non-contiguous tab ids (left by deleted tabs)
 
     bool m_draggingInProgress;
     QPoint m_dragStartPosition;
