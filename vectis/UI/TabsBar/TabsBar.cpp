@@ -27,7 +27,7 @@ TabsBar::TabsBar( QWidget *parent )
     //DEBUG
     // Tryouts here for tabs
 
-    insertTab("First tab", false);
+    insertTab("First tab with longest text", false);
     insertTab("Sec tab", false);
     insertTab("Third tab", false);
 
@@ -153,6 +153,27 @@ int TabsBar::getSelectedTabId () {
     return -1;
 }
 
+// Recalculates the opacity mask m_textOpacityMask in case the width has changed
+void TabsBar::recalculateOpacityMask(QRectF newTabRect) {
+  if (m_textOpacityMask && newTabRect.width() == m_textOpacityMask->width())
+    return; // Nothing has changed
+
+  qDebug() << "Recalculating tab opacity mask (changed to" << newTabRect.width() << ")";
+  // Recalculate the gradient opacity mask for the text that goes on the tabs
+  m_textOpacityMask.reset(new QPixmap(newTabRect.width(),newTabRect.height()));
+  m_textOpacityMask->fill(Qt::transparent);
+
+  const QPoint start(0, 0);
+  const QPoint end(m_textOpacityMask->width(), 0);
+  QLinearGradient gradient(start, end);
+  gradient.setColorAt(0.0, Qt::white);
+  gradient.setColorAt(0.8, Qt::white);
+  gradient.setColorAt(1.0, Qt::transparent);
+
+  QPainter painter(m_textOpacityMask.get());
+  painter.fillRect(m_textOpacityMask->rect(), gradient);
+}
+
 // Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
 // look by adding a nuance
 QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text) {
@@ -211,18 +232,36 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
         p.setPen( darkerGrayPen );
     p.drawPath( grayOuterTabPath );
 
-    // Draw the tab's text in the subrectangle available
-    if( selected == true )
-        p.setPen( Qt::white );
-    else
-        p.setPen( QPen(QColor(193,193,191)) );
+    // Calculate the subrectangle where to draw the text
     QRectF textRect = tabRect;
     textRect.setX(tabRect.x() + h);
-    textRect.setWidth(tabRect.width() - 2*h);
+    textRect.setWidth(tabRect.width() - 2*h -h/4 /* This last one is for the 'x' button */);
     textRect.setY(textRect.y() + 6);
-    p.drawText(textRect,  Qt::AlignLeft, QString(text));
 
-    return tabPath; // This will be used to fade the selected tab's borders, in case this tab was near the selected one
+    recalculateOpacityMask (textRect); // Recalculate the tab's text opacity mask in case width has changed
+
+    // Off-screen renders the text plus opacity mask in a pixMap before actually drawing it into the control
+    QPixmap pixMap(textRect.width(),textRect.height());
+    pixMap.fill(Qt::transparent);
+
+    QPainter textPixmapPainter(&pixMap);
+    // Choose a different color if the tab is selected or unselected
+    if( selected == true )
+        textPixmapPainter.setPen( Qt::white );
+    else
+        textPixmapPainter.setPen( QPen(QColor(193,193,191)) );
+    textPixmapPainter.drawText(pixMap.rect(), Qt::AlignLeft, QString(text)); // Draw the text on the off-screen pixmap
+
+    // Destination (aka the pixmap with the text) is the output, its alpha is reduced by that of the source (the mask)
+    textPixmapPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+
+    // Draw the pre-cached alpha mask over the text rectangle to set its alpha channel
+    textPixmapPainter.drawPixmap(0,0, m_textOpacityMask->width(), m_textOpacityMask->height(), *m_textOpacityMask.get());
+
+    p.drawPixmap(textRect, pixMap, pixMap.rect()); // Finally draw the pixmap with the text drawn + the right alpha mask
+                                                   // in the right textRect on the control
+
+    return tabPath; // Notice: this might be used to fade the selected tab's borders or other graphic manipulations
 }
 
 // Draw an horizontal bar to separate the control from the rest
@@ -287,7 +326,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
 
     if( m_selectedTabIndex != -1 ) {
 
-        QPainterPath temp, leftOfSelected, rightOfSelected;
+        QPainterPath temp;
         // This lambda takes care of calculating the right rect position for a tab with a given index
         // and of calling the drawing function
         auto calculatePositionAndDrawTab = [&](int i, bool leftTabs) {
@@ -303,18 +342,11 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
           }
           if(m_tabs[i]->m_Yoffset != 0) {
               standardTabRect.setY(standardTabRect.y() + m_tabs[i]->m_Yoffset);
+              standardTabRect.setBottom(standardTabRect.bottom() + m_tabs[i]->m_Yoffset);
           }
           standardTabRect.setWidth( tabWidth );
 
           temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i]->m_title );
-
-          if (leftTabs) {
-              if(i == m_selectedTabIndex - 1)
-                  leftOfSelected = temp;
-          } else {
-              if(i == m_selectedTabIndex + 1)
-                rightOfSelected = temp;
-          }
 
           m_tabs[i]->m_region = temp;
 
@@ -345,6 +377,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         }
         if(m_tabs[m_selectedTabIndex]->m_Yoffset != 0) {
             standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex]->m_Yoffset);
+            standardTabRect.setBottom(standardTabRect.bottom() + m_tabs[m_selectedTabIndex]->m_Yoffset);
         }
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
@@ -359,9 +392,9 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
     if ( evt->button() == Qt::LeftButton ) {
         m_dragStartPosition = evt->pos();
         m_selectionStartIndex = m_selectedTabIndex;
-        for( size_t i=0; i<m_tabs.size(); ++i ) {
+        for( int i=0; i<static_cast<int>(m_tabs.size()); ++i ) {
             if(m_tabs[i]->m_region.contains(m_dragStartPosition) == true) {
-                m_selectedTabIndex = (int)i;
+                m_selectedTabIndex = i;
                 repaint();
                 // TODO: send a signal "changedSelectedTab" with the integer 'm_selectedTabIndex'
             }
@@ -370,7 +403,7 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
     qDebug() << "mousePressEvent " << m_dragStartPosition;
 }
 
-// This event deals with tab dragging
+// This event deals with tab dragging (tracking)
 void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
     if ( !(evt->buttons() & Qt::LeftButton) ) // The only button we deal with for tracking
         return;

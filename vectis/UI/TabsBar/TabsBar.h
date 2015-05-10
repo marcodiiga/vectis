@@ -138,6 +138,11 @@ private:
     // issues, thus it is necessary to use pointers to their memory to move them in different cells
     std::vector<std::unique_ptr<SlideToPositionAnimation>> m_XInterpolators;
     std::vector<std::unique_ptr<SlideToPositionAnimation>> m_YInterpolators;
+
+    // Any time text is drawn on a tab, it has an opacity mask on it to fade it out before the 'x' button.
+    // The opacity mask can be cached with this variable until the width of all the tabs changes
+    std::unique_ptr<QPixmap> m_textOpacityMask;
+    void recalculateOpacityMask(QRectF newTabRect);
 };
 
 #endif // TABSBAR_H
