@@ -149,6 +149,10 @@ void VMainWindow::selectedTabChangedSlot(int newId) {
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
     qDebug() << "Tab was requested to close: " << tabId;
     m_tabsBar->deleteTab(tabId);
+    if (tabId == currentlySelected) {
+      m_customCodeEdit->setText("");
+      currentlySelected = m_tabsBar->getSelectedTabId();
+    }
     contents.erase(tabId);
 }
 
