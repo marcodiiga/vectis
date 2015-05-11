@@ -107,12 +107,20 @@ VMainWindow::VMainWindow(QWidget *parent) :
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
 }
 
+#include <sstream>
+std::map<int, QString> contents;
+int currentlySelected = -1;
+
 bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) { // DEBUG EVENT FILTER
     if ( event->type() == QEvent::KeyPress ) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        if( keyEvent->key() == Qt::Key_Plus ) {
-            ptr->insertTab("hello");
-        } else if( keyEvent->key() == Qt::Key_Minus ) {
+        if( keyEvent->key() == Qt::Key_T && keyEvent->modifiers() == Qt::CTRL ) {
+          static int number = 0;
+          std::stringstream ss;
+          ss << "Document" << ++number;
+          std::string str = ss.str();
+          currentlySelected = ptr->insertTab(QString(str.c_str()));
+        } else if( keyEvent->key() == Qt::Key_F4 && keyEvent->modifiers() == Qt::CTRL ) {
           ptr->deleteTab(ptr->getSelectedTabId());
         }
     }
@@ -125,13 +133,23 @@ void VMainWindow::paintEvent(QPaintEvent *)
 
 }
 
+
 void VMainWindow::selectedTabChangedSlot(int newId) {
     qDebug() << "Selected tab has changed to " << newId;
+    // Save everything to buffer
+    contents[currentlySelected] = m_customCodeEdit->toPlainText();
+    currentlySelected = newId;
+    auto it = contents.find(newId);
+    if (it != contents.end())
+      m_customCodeEdit->setText(it->second);
+    else
+      m_customCodeEdit->setText("");
 }
 
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
     qDebug() << "Tab was requested to close: " << tabId;
     m_tabsBar->deleteTab(tabId);
+    contents.erase(tabId);
 }
 
 VMainWindow::~VMainWindow() {

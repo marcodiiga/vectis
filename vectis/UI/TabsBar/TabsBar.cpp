@@ -17,7 +17,6 @@ TabsBar::TabsBar( QWidget *parent )
     // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without
     // any system intervention
     setAttribute( Qt::WA_OpaquePaintEvent, false );
-    //qInstallMessageHandler(crashMessageOutput);
     setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
 
     QFont font("Verdana");
@@ -25,19 +24,6 @@ TabsBar::TabsBar( QWidget *parent )
     this->setFont(font);
 
     setMouseTracking(true); // Allows cursor tracking even when there isn't anything clicked
-
-    //DEBUG
-    //DEBUG
-    // Tryouts here for tabs
-
-    insertTab("First tab with longest text", false);
-    insertTab("Sec tab", false);
-    insertTab("Third tab", false);
-
-
-
-    m_selectedTabIndex = 1;
-    //DEBUG
 }
 
 // Dynamically inserts a tab into the control by providing a "sliding" vertical animation
@@ -75,6 +61,7 @@ int TabsBar::insertTab(const QString text, bool animation) {
     }
 
     m_selectedTabIndex = newTabIndex; // Also make it the new selected one
+    emitSelectionHasChanged (m_selectedTabIndex); // Signal that the selection has changed
     repaint();
 
     return newId;
@@ -463,8 +450,8 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
                     emit tabWasRequestedToClose (m_tabs[i]->getTabId());
                 } else { // New selection
                     m_selectedTabIndex = i;
-                    repaint();
                     emitSelectionHasChanged (m_selectedTabIndex); // Signal that the selection has changed
+                    repaint();                    
                 }
             }
         }
