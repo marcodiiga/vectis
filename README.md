@@ -1,4 +1,8 @@
 # Vectis
 WIP: responsive UI framework for text editors
 
-[Example](https://www.youtube.com/watch?v=I5P2YzpZCSQ)
+## Widgets status
+Tabs bar - 100% completed (ready to be used)
+Code edit control - 5% completed
+
+[Example](https://youtu.be/wD_eQYSmGxE)
