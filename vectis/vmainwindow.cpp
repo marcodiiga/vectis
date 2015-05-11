@@ -27,6 +27,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
 
+
     // Create the TabsBar
     m_tabsBar = std::make_unique<TabsBar>(this);
     //TabsBar ea;
@@ -34,6 +35,12 @@ VMainWindow::VMainWindow(QWidget *parent) :
     //m_tabsBar->addTab("test tab");
     //m_tabsBar->addTab("another tab");
     ui->codeTextEditArea->addWidget(m_tabsBar.get());
+    // Link the "changed selected tab" and "tab was requested to close" signals to slots
+    connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int)),
+            this, SLOT(selectedTabChangedSlot(int)));
+    connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
+            this, SLOT(tabWasRequestedToCloseSlot(int)));
+
 
 
     // Create the code editor control
@@ -116,6 +123,15 @@ bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) { // DEBUG EVENT
 void VMainWindow::paintEvent(QPaintEvent *)
 {
 
+}
+
+void VMainWindow::selectedTabChangedSlot(int newId) {
+    qDebug() << "Selected tab has changed to " << newId;
+}
+
+void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
+    qDebug() << "Tab was requested to close: " << tabId;
+    m_tabsBar->deleteTab(tabId);
 }
 
 VMainWindow::~VMainWindow() {

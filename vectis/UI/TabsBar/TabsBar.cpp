@@ -9,7 +9,8 @@
 TabsBar::TabsBar( QWidget *parent )
     : m_parent(parent),
       m_draggingInProgress(false),
-      m_selectedTabIndex(-1)
+      m_selectedTabIndex(-1),
+      m_mouseHoveringCloseBtnTabIndex(-1)
 {
     Q_ASSERT( parent );
 
@@ -22,6 +23,8 @@ TabsBar::TabsBar( QWidget *parent )
     QFont font("Verdana");
     font.setPixelSize(10);
     this->setFont(font);
+
+    setMouseTracking(true); // Allows cursor tracking even when there isn't anything clicked
 
     //DEBUG
     //DEBUG
@@ -121,9 +124,11 @@ void TabsBar::deleteTab(int id, bool animation) {
         if (tabsBar.m_selectedTabIndex >= tabsBar.m_tabs.size())
           tabsBar.m_selectedTabIndex = static_cast<int>(tabsBar.m_tabs.size()) - 1;
       }
-      // TODO: RELOAD DOCUMENT EVENT HERE
+      if (tabsBar.m_selectedTabIndex != -1) // Do not emit any new selection signal for "no more tabs"
+        tabsBar.emitSelectionHasChanged(tabsBar.m_selectedTabIndex); // Signal that now it would be a good time to
+                                                                     // update a view with the new selection
     } else { // Keep the selected one active
-      // TODO: NO RELOAD DOCUMENT EVENT HERE
+      // Do NOT reload the document here (no new selection)
       if (delTabIndex  < tabsBar.m_selectedTabIndex)
         tabsBar.m_selectedTabIndex--;
       // No need to do anything if it was on the right
@@ -174,9 +179,11 @@ void TabsBar::recalculateOpacityMask(QRectF newTabRect) {
   painter.fillRect(m_textOpacityMask->rect(), gradient);
 }
 
-// Draw a tab (selected or not) into a given rect. If left and right tabs are known, it allows to have a nicer
-// look by adding a nuance
-QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text) {
+// This is a fundamental function: it draws a tab (selected or not) into a given rect. It changes color
+// for the tab's text and tab's close X button according to its selection and if the mouse is hovering
+// on the close button for this tab
+TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool selected, QString text,
+                                             bool mouseHoveringXBtn) {
     // Decide colors for a selected or unselected tab
     QColor topGradientColor, bottomGradientColor;
     if( selected == false ) { // Unselected
@@ -194,7 +201,7 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     // |    /          |
     // |___/____c1_____|
     // 0;h              h;h
-    QPainterPath tabPath;
+    QPainterPath tabPath, closeButtonPath;
     p.setRenderHint(QPainter::Antialiasing);
     const QPointF c1(0.6f, 1.0f-0.01f), c2(0.53f, 1.0f-1.0f);
     const int h = tabRect.height();
@@ -238,7 +245,18 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     textRect.setWidth(tabRect.width() - 2*h -h/4 /* This last one is for the 'x' button */);
     textRect.setY(textRect.y() + 6);
 
+    // Before drawing the text, an opacity mask is applied. This ensures a text longer than the tab itself
+    // has a nice fade-out effect before the X button
+    //
+    //   _________________
+    //  / Very long text X\
+    //    ^           ^ ^
+    //    |           | |
+    //    |           |  --- Completely faded
+    //    |            --- Starting to fade
+    //    Text not faded
     recalculateOpacityMask (textRect); // Recalculate the tab's text opacity mask in case width has changed
+                                       // otherwise grab the cached one
 
     // Off-screen renders the text plus opacity mask in a pixMap before actually drawing it into the control
     QPixmap pixMap(textRect.width(),textRect.height());
@@ -261,7 +279,38 @@ QPainterPath TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, bool 
     p.drawPixmap(textRect, pixMap, pixMap.rect()); // Finally draw the pixmap with the text drawn + the right alpha mask
                                                    // in the right textRect on the control
 
-    return tabPath; // Notice: this might be used to fade the selected tab's borders or other graphic manipulations
+    // Last element to be drawn is the exit button pixmap (the X close button)
+    // Calculate the X button drawing rect (some adjustment factors have been empirically chosen)
+    QRectF xRect = tabRect;
+    xRect.setX( textRect.x() + textRect.width() + h/4 - 2 );
+    xRect.setWidth( h/6 + 4 );
+    xRect.setY( xRect.y() + xRect.height() / 2 - h/8 - 2 );
+    xRect.setHeight( h/6 + 4 );
+    closeButtonPath.addEllipse(xRect); // Add it to a QPainterPath to be returned (for the intersection test)
+
+    // Create the pixmap, fill it transparent and start painting on it
+    QPixmap closeBtnPixmap(xRect.width(), xRect.height());
+    closeBtnPixmap.fill(Qt::transparent);
+    QPainter closePixmapPainter(&closeBtnPixmap);
+
+    closePixmapPainter.setRenderHint( QPainter::Antialiasing, true );
+    closePixmapPainter.setRenderHint( QPainter::HighQualityAntialiasing, true );
+
+    const QPen unselectedXBtn(QColor(144, 144, 144), 1.42);
+    const QPen selectedXBtn(QColor(175, 175, 175), 1.42);
+    // Change the color of the 'X' icon according to the mouse hovering status detected
+    if (mouseHoveringXBtn == true)
+        closePixmapPainter.setPen( selectedXBtn );
+    else
+        closePixmapPainter.setPen( unselectedXBtn );
+
+    // Draw the 'X' with two simple anti-aliased lines
+    closePixmapPainter.drawLine(QPointF(2,2), QPointF(xRect.width()-2, xRect.height()-2));
+    closePixmapPainter.drawLine(QPointF(2, xRect.height()-2), QPointF(xRect.width()-2, 2));
+
+    p.drawPixmap(xRect, closeBtnPixmap, closeBtnPixmap.rect()); // Draw the 'X' close button
+
+    return {std::move(tabPath), std::move(closeButtonPath)}; // Notice: this might be used to fade the selected tab's borders or other graphic manipulations
 }
 
 // Draw an horizontal bar to separate the control from the rest
@@ -329,26 +378,33 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         QPainterPath temp;
         // This lambda takes care of calculating the right rect position for a tab with a given index
         // and of calling the drawing function
-        auto calculatePositionAndDrawTab = [&](int i, bool leftTabs) {
+        auto calculatePositionAndDrawTab = [&, standardTabRect /* Avoids spoiling the original standardTabRect */]
+                (int i, bool leftTabs) mutable {
+          QRect standardTabRectLambda = standardTabRect; // Avoids MSVC problems with capture by value
+
+          // Calculate tab position
           int x = 5 + i * tabWidth;
           x -= TAB_INTERSECTION_DELTA * i;
-          standardTabRect.setX( x );
-          // If we have a 'decreasing' offset, add it
+          standardTabRectLambda.setX( x );
+
+          // If we have an X or Y offset, add it
           if(m_tabs[i]->m_Xoffset != 0) {
               if (leftTabs)
-                standardTabRect.setX(standardTabRect.x() + m_tabs[i]->m_Xoffset);
+                standardTabRectLambda.setX(standardTabRectLambda.x() + m_tabs[i]->m_Xoffset);
               else
-                standardTabRect.setX(standardTabRect.x() - m_tabs[i]->m_Xoffset);
+                standardTabRectLambda.setX(standardTabRectLambda.x() - m_tabs[i]->m_Xoffset);
           }
           if(m_tabs[i]->m_Yoffset != 0) {
-              standardTabRect.setY(standardTabRect.y() + m_tabs[i]->m_Yoffset);
-              standardTabRect.setBottom(standardTabRect.bottom() + m_tabs[i]->m_Yoffset);
+              standardTabRectLambda.setY(standardTabRectLambda.y() + m_tabs[i]->m_Yoffset);
+              standardTabRectLambda.setBottom(standardTabRectLambda.bottom() + m_tabs[i]->m_Yoffset);
           }
-          standardTabRect.setWidth( tabWidth );
+          standardTabRectLambda.setWidth( tabWidth );
 
-          temp = drawTabInsideRect( p, standardTabRect, false, m_tabs[i]->m_title );
+          TabPaths&& temp = drawTabInsideRect( p, standardTabRectLambda, false, m_tabs[i]->m_title,
+                                             m_mouseHoveringCloseBtnTabIndex == i);
 
-          m_tabs[i]->m_region = temp;
+          m_tabs[i]->m_region = temp.tabRegion;
+          m_tabs[i]->m_closeBtnRegion = temp.closeBtnRegion;
 
           // Debug code to visualize tab rects
           //p.setPen(QColor(255 - i*20,0,0));
@@ -360,7 +416,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
             calculatePositionAndDrawTab(i, true);
 
         // Draw tabs at the right of the selected one
-        for( int i = (int)m_tabs.size()-1; i > m_selectedTabIndex; --i )
+        for( int i = static_cast<int>(m_tabs.size()-1); i > m_selectedTabIndex; --i )
             calculatePositionAndDrawTab(i, false);
 
         drawGrayHorizontalBar( p, innerGrayCol );
@@ -375,14 +431,18 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
         } else if(m_tabs[m_selectedTabIndex]->m_Xoffset != 0) {
             x += m_tabs[m_selectedTabIndex]->m_Xoffset;
         }
-        if(m_tabs[m_selectedTabIndex]->m_Yoffset != 0) {
+        if(m_tabs[m_selectedTabIndex]->m_Yoffset != 0) { // Also apply Y offsets in case it's being opened/closed
             standardTabRect.setY(standardTabRect.y() + m_tabs[m_selectedTabIndex]->m_Yoffset);
             standardTabRect.setBottom(standardTabRect.bottom() + m_tabs[m_selectedTabIndex]->m_Yoffset);
         }
         standardTabRect.setX( x );
         standardTabRect.setWidth( tabWidth );
 
-        m_tabs[m_selectedTabIndex]->m_region = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex]->m_title);
+        TabPaths paths = drawTabInsideRect( p, standardTabRect, true, m_tabs[m_selectedTabIndex]->m_title,
+                                            m_mouseHoveringCloseBtnTabIndex == m_selectedTabIndex);
+
+        m_tabs[m_selectedTabIndex]->m_region = paths.tabRegion;
+        m_tabs[m_selectedTabIndex]->m_closeBtnRegion = paths.closeBtnRegion;
         m_tabs[m_selectedTabIndex]->m_rect = standardTabRect;
     }
 }
@@ -394,9 +454,18 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
         m_selectionStartIndex = m_selectedTabIndex;
         for( int i=0; i<static_cast<int>(m_tabs.size()); ++i ) {
             if(m_tabs[i]->m_region.contains(m_dragStartPosition) == true) {
-                m_selectedTabIndex = i;
-                repaint();
-                // TODO: send a signal "changedSelectedTab" with the integer 'm_selectedTabIndex'
+                // Click inside tab, but might be a close request (if that happened on the 'x' btn)
+                if (m_tabs[i]->m_closeBtnRegion.contains(m_dragStartPosition) == true) {
+                    // emit a 'Tab was requested to close' signal but do NOT close the tab. The user will have
+                    // to do this. This ensures the user has a chance to save or perform any manipulation
+                    // before triggering a tab deletion
+                    // deleteTab(m_tabs[i]->getTabId());
+                    emit tabWasRequestedToClose (m_tabs[i]->getTabId());
+                } else { // New selection
+                    m_selectedTabIndex = i;
+                    repaint();
+                    emitSelectionHasChanged (m_selectedTabIndex); // Signal that the selection has changed
+                }
             }
         }
     }
@@ -405,6 +474,32 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
 
 // This event deals with tab dragging (tracking)
 void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
+
+    // Estimates the tab's region the mouse could be in. This greatly saves performances.
+    // Warning: due to the TAB_INTERSECTION_DELTA this is not fully reliable when dealing with tab regions
+    int estimatedTabIndex = ceil((evt->pos().x() - TAB_INTERSECTION_DELTA) / (tabWidth - TAB_INTERSECTION_DELTA));
+
+    auto assignHoverAndRepaintIfNecessary = [this](int newHoverValue) { // A lambda to assign and repaint a hover index
+        bool needToRepaint = false;
+        if (newHoverValue != this->m_mouseHoveringCloseBtnTabIndex)
+            needToRepaint = true;
+        this->m_mouseHoveringCloseBtnTabIndex = newHoverValue;
+        if (needToRepaint)
+            this->repaint();
+    };
+
+    if (estimatedTabIndex < m_tabs.size()) {
+        // Test for intersection with close button region
+        if (m_tabs[estimatedTabIndex]->m_closeBtnRegion.contains(evt->pos()) == true) {
+            // We're in the close button region, signal its selection color
+            assignHoverAndRepaintIfNecessary(estimatedTabIndex);
+            return; // No tracking is allowed in the close area
+        }
+    }
+    assignHoverAndRepaintIfNecessary(-1);
+
+    //==-- From this point forward we're only interested in tracking issues --==//
+
     if ( !(evt->buttons() & Qt::LeftButton) ) // The only button we deal with for tracking
         return;
 
@@ -526,7 +621,11 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *) {
     m_draggingInProgress = false;
 }
 
-
+// Emits a selection changed signal (and passes the id to the user)
+void TabsBar::emitSelectionHasChanged(int newIndex) {
+    Q_ASSERT(newIndex != -1);
+    emit selectedTabHasChanged(m_tabs[newIndex]->getTabId());
+}
 
 SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, int associatedTabIndex , bool isHorizontalOffset) :
     m_parent(parent),

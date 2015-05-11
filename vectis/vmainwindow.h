@@ -35,6 +35,8 @@ public:
     tabTestFilter ttf; // DEBUG
 
 private slots:
+    void selectedTabChangedSlot(int newId);
+    void tabWasRequestedToCloseSlot(int tabId);
 
 private:
     Ui::VMainWindow *ui;

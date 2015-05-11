@@ -47,6 +47,7 @@ private:
 
     friend class TabsBar;
     friend class SlideToPositionAnimation;
+    friend class CloseBtnInterpolator;
 
     Tab(QString title) : m_title(title) {}
 
@@ -60,6 +61,7 @@ private:
 
     QString m_title;
     QPainterPath m_region;
+    QPainterPath m_closeBtnRegion;
 
     // Every tab is referred to with a unique id. Notice: this must *NOT* be confused with the
     // tab's index into the tab control (i.e. its position into the control)
@@ -107,7 +109,24 @@ public:
     int getSelectedTabId();
 
 private:
-    QPainterPath drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "");
+
+    class TabPaths {
+    public:
+        TabPaths(QPainterPath&& tr, QPainterPath&& cbr) :
+            tabRegion(std::forward<QPainterPath>(tr)),
+            closeBtnRegion(std::forward<QPainterPath>(cbr))
+        {}
+        TabPaths(TabPaths&& other) :
+            tabRegion(std::move(other.tabRegion)),
+            closeBtnRegion(std::move(other.closeBtnRegion))
+        {}
+
+        QPainterPath tabRegion;
+        QPainterPath closeBtnRegion;
+    };
+
+    TabPaths drawTabInsideRect(QPainter& p, const QRect& tabRect , bool selected , QString text = "",
+                               bool mouseHoveringXBtn = false);
     void drawGrayHorizontalBar( QPainter& p, const QColor innerGrayCol );
 
     friend class SlideToPositionAnimation;
@@ -138,11 +157,21 @@ private:
     // issues, thus it is necessary to use pointers to their memory to move them in different cells
     std::vector<std::unique_ptr<SlideToPositionAnimation>> m_XInterpolators;
     std::vector<std::unique_ptr<SlideToPositionAnimation>> m_YInterpolators;
+    int m_mouseHoveringCloseBtnTabIndex; // The index of the tab whose X button the mouse is hovering on (or -1)
 
     // Any time text is drawn on a tab, it has an opacity mask on it to fade it out before the 'x' button.
     // The opacity mask can be cached with this variable until the width of all the tabs changes
     std::unique_ptr<QPixmap> m_textOpacityMask;
     void recalculateOpacityMask(QRectF newTabRect);
+
+    void emitSelectionHasChanged(int);
+
+signals:
+    // As the name suggests, this might be useful to signal a view refresh.
+    // Sends the id of the newly selected tab
+    void selectedTabHasChanged(int newTabId);
+    // Sends the id of the tab which has been asked to close down (it hasn't been closed yet)
+    void tabWasRequestedToClose(int tabId);
 };
 
 #endif // TABSBAR_H
