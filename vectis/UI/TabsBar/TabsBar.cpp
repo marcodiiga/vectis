@@ -19,7 +19,11 @@ TabsBar::TabsBar( QWidget *parent )
     setAttribute( Qt::WA_OpaquePaintEvent, false );
     setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
 
+#ifdef _WIN32
     QFont font("Verdana");
+#else
+    QFont font("Ubuntu");
+#endif
     font.setPixelSize(10);
     this->setFont(font);
 
@@ -297,6 +301,7 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
 
     p.drawPixmap(xRect, closeBtnPixmap, closeBtnPixmap.rect()); // Draw the 'X' close button
 
+    // Uses aggregate initialization. Unfortunately QPainterPath is not movable (copy is needed). Keep this code for the future.
     return {std::move(tabPath), std::move(closeButtonPath)}; // Notice: this might be used to fade the selected tab's borders or other graphic manipulations
 }
 

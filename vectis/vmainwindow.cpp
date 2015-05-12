@@ -6,7 +6,7 @@
 
 #include <QDebug>
 
-
+#include <QFontDatabase>
 
 
 VMainWindow::VMainWindow(QWidget *parent) :
@@ -55,12 +55,23 @@ VMainWindow::VMainWindow(QWidget *parent) :
                                      border: 0px;                                       \
                                      font-size: 12px;                                   \
                                      }");
-    // Consolas is installed by default on every Windows system, but not linux.
-    // Qt's matching engine will try to find Consolas or a replacement monospace font
-    // font-family: Consolas, monospace;
-    QFont font("Consolas");
-    font.setStyleHint(QFont::Monospace);
-    m_customCodeEdit->setFont(font);
+
+
+
+
+    // Consolas is installed by default on every Windows system, but not Linux. On Linux the
+    // preferred one is Monospace. Anyway Qt's matching engine will try to find either or a
+    // replacement monospace font
+#ifdef _WIN32
+    QFont monospace("Consolas");
+#else
+    QFont monospace("Monospace");
+#endif
+    monospace.setStyleHint(QFont::Monospace);
+    m_customCodeEdit->setFont(monospace);
+
+
+
     m_customCodeEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     //ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
     //QScrollBar *vertScrollBar = ui->plainTextEdit->verticalScrollBar();
