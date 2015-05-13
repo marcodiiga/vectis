@@ -1,9 +1,29 @@
 #include <UI/CodeTextEdit/CodeTextEdit.h>
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
-    QTextEdit(parent) {
+    QAbstractScrollArea(parent) {
+
+    Q_ASSERT(parent);
+
+    // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without
+    // any system intervention
+    setAttribute( Qt::WA_OpaquePaintEvent, false );
+
+    // Create the vertical scrollbar and set it as "always on"
+    m_verticalScrollBar = std::make_unique<ScrollBar>( this );
+    this->setVerticalScrollBar( m_verticalScrollBar.get() );
+    setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
+
+    //    m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
+    //                                                                  QScrollBar:vertical {\
+    //                                                                    width:15px;\
+    //                                                                  }"));
+
 }
 
+
+void CodeTextEdit::paintEvent(QPaintEvent *) {
+}
 
 /*
 

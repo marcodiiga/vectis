@@ -40,8 +40,7 @@ private slots:
 
 private:
     Ui::VMainWindow *ui;
-    std::unique_ptr<CodeTextEdit> m_customCodeEdit;
-    std::unique_ptr<ScrollBar>    m_verticalScrollBar;
+    std::unique_ptr<CodeTextEdit> m_customCodeEdit;    
     std::unique_ptr<TabsBar>      m_tabsBar;
 };
 

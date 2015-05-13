@@ -29,7 +29,7 @@ bool PgKeyEater::eventFilter ( QObject *obj, QEvent *event ) {
     return QObject::eventFilter( obj, event );
 }
 
-ScrollBar::ScrollBar ( QTextEdit * parent ) :
+ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
     QScrollBar(parent),
     m_parent(parent),
     m_textLineHeight(1), // Height of every line, it depends on the font used (although it's always monospaced)
@@ -46,12 +46,22 @@ ScrollBar::ScrollBar ( QTextEdit * parent ) :
     // WA_NoSystemBackground avoids the system to draw the background (we'll handle it as well)
     setAttribute( Qt::WA_OpaquePaintEvent, false );
     setAttribute( Qt::WA_NoSystemBackground, true );
+    setStyleSheet(QString("QScrollBar:vertical { \
+                              width:15px;        \
+                           }"));
 
+
+    // TODO
+    // TODO: we need a documentSizeChanged event!! CodeTextEdit NEEDS to relink this!
+    // TODO
+    //
     // Only way to detect when line wrapping inserts additional lines is through documentSizeChanged()
-    connect( m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
-            this, SLOT(documentSizeChanged(const QSizeF&)) );
+    //connect( m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
+    //        this, SLOT(documentSizeChanged(const QSizeF&)) );
+
+
     // Handling signals scroll mouse / page down-up / dragging (tracking)
-    connect(this, SIGNAL( actionTriggered(int)), this, SLOT(actionTriggered(int)));
+    connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
     connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
     connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
 
@@ -79,6 +89,9 @@ void ScrollBar::sliderPressed () {
 void ScrollBar::moveParentCaret() {
     int pageValue = m_scrollAnim.property("pageStepEvent").toInt();
     if(pageValue > 0) { // PageDown or PageUp was pressed
+
+        /* TODO: find a way to provide a cursor.movePosition to the CodeTextEdit
+
         QTextCursor cursor = m_parent->textCursor();
         // Rewind the cursor to the beginning of the document and then position it at the line it had to be positioned
         cursor.movePosition( QTextCursor::Start, QTextCursor::MoveAnchor );
@@ -86,6 +99,8 @@ void ScrollBar::moveParentCaret() {
                              value() / m_textLineHeight ); // Recall that the slider's value is line_index * line_height
         m_parent->setTextCursor(cursor);
         m_scrollAnim.setProperty("pageStepEvent", 0); // Helps not to reset the caret for a mouse scroll (it isn't needed)
+
+        */
     }
 }
 
@@ -133,6 +148,8 @@ void ScrollBar::sliderChange ( SliderChange change ) {
 // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
 void ScrollBar::documentSizeChanged(const QSizeF & newSize) {
 
+    /* TODO: fix this when we have a working documentSizeChanged
+
     // Useful information:
     // - The hierarchy used to find the parent QPlainTextEdit widget is:
     //   QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
@@ -152,6 +169,9 @@ void ScrollBar::documentSizeChanged(const QSizeF & newSize) {
     setMaximum( (m_internalLineCount - 1)* m_textLineHeight );
     // qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxViewVisibleLines << " m_internalLineCount "
     //   << m_internalLineCount;
+
+
+    */
 }
 
 // The most important event in the control: repaint.

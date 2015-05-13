@@ -43,9 +43,16 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
 
+
+
+
+
     // Create the code editor control
     m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
     ui->codeTextEditArea->addWidget(m_customCodeEdit.get());
+
+
+
 
     qWarning() << "TODO: move stylesheet and font setting INSIDE the control, not here!";
     // Set background color for the edit code control
@@ -92,16 +99,16 @@ VMainWindow::VMainWindow(QWidget *parent) :
                 "));*/
 
     // Create the vertical scrollbar and assign it to the code editor
-    m_verticalScrollBar = std::make_unique<ScrollBar>(m_customCodeEdit.get());
-    m_customCodeEdit->setVerticalScrollBar(m_verticalScrollBar.get());
-    m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
-                                                                  QScrollBar:vertical {\
-                                                                    width:15px;\
-                                                                  }"));
+//    m_verticalScrollBar = std::make_unique<ScrollBar>(m_customCodeEdit.get());
+//    m_customCodeEdit->setVerticalScrollBar(m_verticalScrollBar.get());
+//    m_customCodeEdit->verticalScrollBar()->setStyleSheet(QString("\
+//                                                                  QScrollBar:vertical {\
+//                                                                    width:15px;\
+//                                                                  }"));
 
-    // DEBUG CODE
-    ttf.ptr = m_tabsBar.get();
-    m_customCodeEdit->installEventFilter( &ttf );
+//    // DEBUG CODE
+//    ttf.ptr = m_tabsBar.get();
+//    m_customCodeEdit->installEventFilter( &ttf );
 
 
     //vertScrollBar->setAttribute( Qt::WA_TranslucentBackground );
@@ -137,23 +144,23 @@ void VMainWindow::paintEvent(QPaintEvent *)
 void VMainWindow::selectedTabChangedSlot(int newId) {
     qDebug() << "Selected tab has changed to " << newId;
     // Save everything to buffer
-    contents[currentlySelected] = m_customCodeEdit->toPlainText();
-    currentlySelected = newId;
-    auto it = contents.find(newId);
-    if (it != contents.end())
-      m_customCodeEdit->setText(it->second);
-    else
-      m_customCodeEdit->setText("");
+//    contents[currentlySelected] = m_customCodeEdit->toPlainText();
+//    currentlySelected = newId;
+//    auto it = contents.find(newId);
+//    if (it != contents.end())
+//      m_customCodeEdit->setText(it->second);
+//    else
+//      m_customCodeEdit->setText("");
 }
 
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
-    qDebug() << "Tab was requested to close: " << tabId;
-    m_tabsBar->deleteTab(tabId);
-    if (tabId == currentlySelected) {
-      m_customCodeEdit->setText("");
-      currentlySelected = m_tabsBar->getSelectedTabId();
-    }
-    contents.erase(tabId);
+//    qDebug() << "Tab was requested to close: " << tabId;
+//    m_tabsBar->deleteTab(tabId);
+//    if (tabId == currentlySelected) {
+//      m_customCodeEdit->setText("");
+//      currentlySelected = m_tabsBar->getSelectedTabId();
+//    }
+//    contents.erase(tabId);
 }
 
 VMainWindow::~VMainWindow() {
