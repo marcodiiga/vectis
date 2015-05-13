@@ -1,6 +1,7 @@
 #include <UI/CodeTextEdit/CodeTextEdit.h>
 #include <QPainter>
-#include <QFile>
+#include <QResizeEvent>
+
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
     QAbstractScrollArea(parent) {
@@ -19,18 +20,28 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
     m_verticalScrollBar = std::make_unique<ScrollBar>( this );
     this->setVerticalScrollBar( m_verticalScrollBar.get() );
     setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
+
+    // Set a font to use in this control
+    // Consolas is installed by default on every Windows system, but not Linux. On Linux the
+    // preferred one is Monospace. Anyway Qt's matching engine will try to find either or a
+    // replacement monospace font
+#ifdef _WIN32
+    m_monospaceFont.setFamily( "Consolas" );
+#else
+    m_monospaceFont.setFamily( "Monospace" );
+#endif
+    m_monospaceFont.setStyleHint( QFont::Monospace );
+    setFont( m_monospaceFont );
 }
 
-// Loads a text or code file from a path. Returns true on success
-bool CodeTextEdit::loadFile (QString file) {
-//    QFile f(file);
-//    if (f.open(QFile::Text) == false)
-//        return false;
-//        QTextStream in(&f);
-//        qDebug() << f.size() << in.readAll();
-    return false;
+void CodeTextEdit::loadDocument(Document *doc) {
+    m_document.reset(doc);
+    // TODO: update the view
 }
 
+int CodeTextEdit::getViewportWidth() const {
+  return this->viewport()->width();
+}
 
 void CodeTextEdit::paintEvent (QPaintEvent *event) {
     QPainter painter(viewport());
@@ -41,6 +52,10 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
     painter.fillRect(this->rect(), backgroundBrush);
 
     QAbstractScrollArea::paintEvent(event);
+}
+void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
+  if (m_document)
+    m_document->setWrapWidth(evt->size().width());
 }
 
 /*
