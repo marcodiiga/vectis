@@ -32,8 +32,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
     m_tabsBar = std::make_unique<TabsBar>(this);
     //TabsBar ea;
     m_tabsBar->setFixedHeight(35);
-    //m_tabsBar->addTab("test tab");
-    //m_tabsBar->addTab("another tab");
+    m_tabsBar->insertTab("test tab", false);
+    m_tabsBar->insertTab("another tab", false);
     ui->codeTextEditArea->addWidget(m_tabsBar.get());
     // Link the "changed selected tab" and "tab was requested to close" signals to slots
     connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int)),
@@ -50,36 +50,28 @@ VMainWindow::VMainWindow(QWidget *parent) :
     // Create the code editor control
     m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
     ui->codeTextEditArea->addWidget(m_customCodeEdit.get());
+    // DEBUG: load a cpp document and try to render everything
+    m_customCodeEdit->loadFile("TestData/BasicBlock.cpp");
 
 
 
 
-    qWarning() << "TODO: move stylesheet and font setting INSIDE the control, not here!";
-    // Set background color for the edit code control
-    m_customCodeEdit->setStyleSheet("QTextEdit {                                        \
-                                     background-color: #272822;                         \
-                                     color: white;                                      \
-                                     border: 0px;                                       \
-                                     font-size: 12px;                                   \
-                                     }");
 
 
 
-
-    // Consolas is installed by default on every Windows system, but not Linux. On Linux the
-    // preferred one is Monospace. Anyway Qt's matching engine will try to find either or a
-    // replacement monospace font
-#ifdef _WIN32
-    QFont monospace("Consolas");
-#else
-    QFont monospace("Monospace");
-#endif
-    monospace.setStyleHint(QFont::Monospace);
-    m_customCodeEdit->setFont(monospace);
-
+//    // Consolas is installed by default on every Windows system, but not Linux. On Linux the
+//    // preferred one is Monospace. Anyway Qt's matching engine will try to find either or a
+//    // replacement monospace font
+//#ifdef _WIN32
+//    QFont monospace("Consolas");
+//#else
+//    QFont monospace("Monospace");
+//#endif
+//    monospace.setStyleHint(QFont::Monospace);
+//    m_customCodeEdit->setFont(monospace);
 
 
-    m_customCodeEdit->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+
     //ui->plainTextEdit->setVerticalScrollBar(new CustomScrollBar(ui->plainTextEdit));
     //QScrollBar *vertScrollBar = ui->plainTextEdit->verticalScrollBar();
 

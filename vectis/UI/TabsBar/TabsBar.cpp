@@ -16,8 +16,9 @@ TabsBar::TabsBar( QWidget *parent )
 
     // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without
     // any system intervention
-    setAttribute( Qt::WA_OpaquePaintEvent, false );
-    setStyleSheet("QWidget { background-color: rgb(22,23,19); }");
+    setAttribute( Qt::WA_OpaquePaintEvent, true );
+    setAttribute( Qt::WA_NoSystemBackground, true );
+    setStyleSheet( "QWidget { background-color: rgb(22,23,19); }" );
 
 #ifdef _WIN32
     QFont font("Verdana");
@@ -367,7 +368,6 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
 
     if( m_selectedTabIndex != -1 ) {
 
-        QPainterPath temp;
         // This lambda takes care of calculating the right rect position for a tab with a given index
         // and of calling the drawing function
         auto calculatePositionAndDrawTab = [&, standardTabRect /* Avoids spoiling the original standardTabRect */]
