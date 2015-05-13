@@ -29,3 +29,5 @@ FORMS    += vmainwindow.ui
 !win32 {
     QMAKE_CXXFLAGS += -std=c++14
 }
+
+RESOURCES +=

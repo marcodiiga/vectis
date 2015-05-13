@@ -110,17 +110,7 @@ public:
 
 private:
 
-    class TabPaths {
-    public:
-        TabPaths(QPainterPath&& tr, QPainterPath&& cbr) :
-            tabRegion(std::forward<QPainterPath>(tr)),
-            closeBtnRegion(std::forward<QPainterPath>(cbr))
-        {}
-        TabPaths(TabPaths&& other) :
-            tabRegion(std::move(other.tabRegion)),
-            closeBtnRegion(std::move(other.closeBtnRegion))
-        {}
-
+    struct TabPaths {
         QPainterPath tabRegion;
         QPainterPath closeBtnRegion;
     };
