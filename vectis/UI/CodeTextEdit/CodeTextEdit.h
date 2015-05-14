@@ -13,6 +13,7 @@ public:
 
     void loadDocument(Document *doc);
     int getViewportWidth() const;
+    int getCharacterWidthPixels() const;
 
 private:
     void paintEvent(QPaintEvent *event);
@@ -22,7 +23,8 @@ private:
     void resizeEvent(QResizeEvent *evt);
 
     QFont m_monospaceFont;
-    std::shared_ptr<Document>     m_document;
+    int m_characterWidthPixels;
+    Document *m_document;
     std::unique_ptr<ScrollBar>    m_verticalScrollBar;
 };
 

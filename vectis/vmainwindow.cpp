@@ -46,12 +46,12 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Create the code editor control
-  m_customCodeEdit = std::make_unique<CodeTextEdit>( this );
+  m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
   ui->codeTextEditArea->addWidget( m_customCodeEdit.get() );
-          // DEBUG: load a cpp document and try to render everything
-  Document *doc = new Document( *m_customCodeEdit ); // Leaking DEBUG - make it a vector
-  doc->loadFromFile( "TestData/BasicBlock.cpp" );
-  m_customCodeEdit->loadDocument( doc );
+  // Create a document, load a file and assign it to the code edit control (i.e. DEBUG - try to render it)
+  m_documents.emplace_back (std::make_unique<Document>(*m_customCodeEdit));
+  m_documents[0]->loadFromFile( "../vectis/TestData/BasicBlock.cpp" );
+  m_customCodeEdit->loadDocument( m_documents[0].get() );
 
 
 

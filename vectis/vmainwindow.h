@@ -40,6 +40,7 @@ private slots:
 
 private:
     Ui::VMainWindow *ui;
+    std::vector<std::unique_ptr<Document>> m_documents;
     std::unique_ptr<CodeTextEdit> m_customCodeEdit;    
     std::unique_ptr<TabsBar>      m_tabsBar;
 };

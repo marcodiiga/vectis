@@ -15,11 +15,8 @@ private:
 
 class PhysicalLine {
 public:
-  template<typename T>
-  PhysicalLine (T&& editorLine) {
-    static_assert(std::is_same<typename std::remove_reference<T>::type, EditorLine>::value,
-                  "Expected EditorLine argument");
-    m_editorLines.emplace_back(std::forward<T>(editorLine));
+  PhysicalLine (EditorLine&& editorLine) {
+    m_editorLines.emplace_back(std::forward<EditorLine>(editorLine));
   }
 
 private:
@@ -43,6 +40,7 @@ private:
 
     QString m_plainText;
     const CodeTextEdit& m_codeTextEdit;
+    int m_characterWidthPixels;
     int m_wrapWidth;
     std::vector<PhysicalLine> m_physicalLines;
 };

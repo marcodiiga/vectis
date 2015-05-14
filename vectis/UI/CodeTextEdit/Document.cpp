@@ -8,7 +8,7 @@
 Document::Document(const CodeTextEdit& codeTextEdit) :
   m_codeTextEdit(codeTextEdit),
   m_wrapWidth(-1)
-{
+{  
   //qDebug() << m_codeTextEdit.fontMetrics().maxWidth() << " " << m_codeTextEdit.getViewportWidth();
 }
 
@@ -25,6 +25,7 @@ bool Document::loadFromFile(QString file) {
   // Load the entire file into memory (expensive but necessary)
   m_plainText = in.readAll();
 
+  f.close();
   return true;
 }
 
@@ -33,7 +34,7 @@ bool Document::loadFromFile(QString file) {
 void Document::setWrapWidth(int width) {
   m_wrapWidth = width;
   qDebug() << "setWrapWidth() to " << width;
-  // TODO trigger recalculate
+  recalculateDocument (); // Recalculate the editor lines with this wrap value
 }
 
 
@@ -46,15 +47,16 @@ void Document::recalculateDocument () {
     if (line.isNull())
       continue;
 
-    if (m_wrapWidth != -1 && line.count() > m_wrapWidth) {
+    if (m_wrapWidth != -1 && // Also check if the monospace'd width isn't exceeding the viewport
+        line.count() * m_codeTextEdit.getCharacterWidthPixels() > m_wrapWidth) {
       // We have a wrap and the line is too big - WRAP IT
 
       // TODO
 
     } else {
       // No wrap or the line fits perfectly within the wrap limits
-
-      m_physicalLines.emplace_back( PhysicalLine ( EditorLine(line) ) );
+      PhysicalLine line(( EditorLine(line) ));
+      m_physicalLines.emplace_back( std::move(line) );
     }
 
   } while(line.isNull() == false);
