@@ -61,6 +61,25 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   painter.setBrush(backgroundBrush);
   painter.fillRect(this->rect(), backgroundBrush);
 
+  // DEBUG drawing code
+
+  painter.setPen(QPen(Qt::white));
+  QPointF startpoint(5, 20);
+  for(auto pl : m_document->m_physicalLines) {
+    auto el = pl.m_editorLines[0];
+//    for(auto ts : el.m_textSegments) {
+//      QString tss(el.m_characters.data() + ts.start, ts.length);
+//      startpoint.setX(startpoint.x() + m_characterWidthPixels);
+//      painter.drawText(startpoint, tss);
+//    }
+    for(int i=0; i<el.m_characters.size(); ++i) {
+      startpoint.setX(startpoint.x() + m_characterWidthPixels);
+      painter.drawText(startpoint, el.m_characters[i]);
+    }
+    startpoint.setX(5);
+    startpoint.setY(startpoint.y() + fontMetrics().height());
+  }
+
   QAbstractScrollArea::paintEvent(event);
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {

@@ -1,5 +1,6 @@
 #include <UI/CodeTextEdit/Document.h>
 #include <UI/CodeTextEdit/CodeTextEdit.h>
+#include <UI/CodeTextEdit/Lexers/Lexer.h>
 #include <QFile>
 #include <QTextStream>
 
@@ -7,7 +8,9 @@
 
 Document::Document(const CodeTextEdit& codeTextEdit) :
   m_codeTextEdit(codeTextEdit),
-  m_wrapWidth(-1)
+  m_wrapWidth(-1),
+  m_needReLexing(false),
+  m_firstDocumentRecalculate(true)
 {  
   //qDebug() << m_codeTextEdit.fontMetrics().maxWidth() << " " << m_codeTextEdit.getViewportWidth();
 }
@@ -29,19 +32,48 @@ bool Document::loadFromFile(QString file) {
   return true;
 }
 
+void Document::applySyntaxHighlight(SyntaxHighlight s) {
+  m_needReLexing = false;
+  switch(s) {
+    case NONE: {
+      if (m_lexer) {
+        m_lexer.release();
+        m_needReLexing = true; // Syntax has been changed, re-lex the document at the next recalculate
+      }
+    } break;
+    case CPP: {
+      if (!m_lexer || isLexer(m_lexer.get()).ofType(CPPLexerType) == false) {
+        m_lexer.reset( LexerBase::createLexerOfType(CPPLexerType) );
+        m_needReLexing = true; // Syntax has been changed, re-lex the document at the next recalculate
+      }
+    } break;
+  }
+
+
+  // If the document was already recalculated, just recalculate and apply the new syntax highlight
+  if (m_firstDocumentRecalculate == false)
+    recalculateDocumentLines ();
+}
+
 // Triggers a lines/breakpoints recalculation for the entire document. -1 means
 // "no wrap" and it's the default
 void Document::setWrapWidth(int width) {
   m_wrapWidth = width;
   qDebug() << "setWrapWidth() to " << width;
-  recalculateDocument (); // Recalculate the editor lines with this wrap value
+  recalculateDocumentLines (); // Recalculate the editor lines with this wrap value
 }
 
 
-void Document::recalculateDocument () {
+void Document::recalculateDocumentLines () {
+  m_firstDocumentRecalculate = false;
+
   // Scan each line (until a newline is found)
   QTextStream ss(&m_plainText);
   QString line;
+  if (m_needReLexing) {
+    // This document needs re-lexing, reset the lexer we have
+    m_lexer->reset();
+  }
   do {
     line = ss.readLine();
     if (line.isNull())
@@ -53,9 +85,14 @@ void Document::recalculateDocument () {
 
       // TODO
 
-    } else {
-      // No wrap or the line fits perfectly within the wrap limits
-      PhysicalLine line(( EditorLine(line) ));
+    } else { // No wrap or the line fits perfectly within the wrap limits
+      EditorLine el(line);
+
+      if (m_needReLexing) { // Generate TextSegments if relexing is needed
+        m_lexer->lexLine(line, el.m_textSegments);
+      }
+
+      PhysicalLine line(std::move(el));
       m_physicalLines.emplace_back( std::move(line) );
     }
 
