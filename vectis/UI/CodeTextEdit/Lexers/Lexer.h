@@ -4,14 +4,29 @@
 #include <QString>
 #include <vector>
 
+// A list of supported lexers (this might be expanded in the future)
 enum LexerType {
   CPPLexerType
 };
 
+// A list of styles for the segments found by the lexer
+enum Style {
+
+  //==-- Generic styles --==//
+  Normal,
+  Keyword,
+  Comment,
+  QuotedString,
+
+  //==-- C++ specific styles --==//
+  CPP_include
+};
+
 struct StyledTextSegment {
+  StyledTextSegment(int s, int l, Style st) : start(s), length(l), style(st) {}
   int start;
   int length;
-  int style; // TODO: style associated with a lexer
+  Style style = Normal; // Style associated with this segment
 };
 
 // An abstract base class for all the Lexers to implement

@@ -29,6 +29,7 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   // replacement monospace font
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
+  m_monospaceFont.setPixelSize(12);
 #else
   m_monospaceFont.setFamily( "Monospace" );
 #endif
@@ -66,16 +67,35 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   painter.setPen(QPen(Qt::white));
   QPointF startpoint(5, 20);
   for(auto pl : m_document->m_physicalLines) {
+
     auto el = pl.m_editorLines[0];
-//    for(auto ts : el.m_textSegments) {
-//      QString tss(el.m_characters.data() + ts.start, ts.length);
-//      startpoint.setX(startpoint.x() + m_characterWidthPixels);
-//      painter.drawText(startpoint, tss);
-//    }
-    for(int i=0; i<el.m_characters.size(); ++i) {
-      startpoint.setX(startpoint.x() + m_characterWidthPixels);
-      painter.drawText(startpoint, el.m_characters[i]);
+    for(auto ts : el.m_textSegments) {
+
+      QString tss(el.m_characters.data() + ts.start, ts.length);
+      startpoint.setX( 5 + ts.start * m_characterWidthPixels );
+
+      switch (ts.style) {
+        case Normal: {
+          painter.setPen(QPen(Qt::white));
+        } break;
+        case Comment: {
+          painter.setPen(QPen(Qt::green));
+        } break;
+        case CPP_include:
+        case Keyword: {
+          painter.setPen(QPen(Qt::red));
+        } break;
+        case QuotedString: {
+          painter.setPen(QPen(Qt::yellow));
+        } break;
+        default: {
+          painter.setPen(QPen(Qt::white));
+        } break;
+      }
+
+      painter.drawText(startpoint, tss);
     }
+
     startpoint.setX(5);
     startpoint.setY(startpoint.y() + fontMetrics().height());
   }
