@@ -142,6 +142,59 @@ void CPPLexer::addSegment(size_t pos, size_t len, Style style) {
   styleDb->styleSegment.emplace_back(pos, len, style);
 }
 
+void CPPLexer::declarationOrDefinition() { // A global scope declaration or definition
+  // of a function (or some macro-ed stuff e.g. CALLME();)
+
+  // Skip whitespaces
+  while (str->at(pos) == ' ') {
+    pos++;
+  }
+
+  // A return type or identifier is expected here
+  size_t startSegment = pos;
+  while (str->at(pos) != ' ' && str->at(pos) != '(') {
+    pos++;
+  }
+  if (str->at(pos) == ' ') { // Probably a return type (and it might be a keyword)
+    Style s = Normal;
+    if(m_reservedKeywords.find(str->substr(startSegment, pos - startSegment)) !=
+       m_reservedKeywords.end())
+      s = Keyword;
+    addSegment(startSegment, pos - startSegment, s);
+    pos++;
+
+    // Now add the real identifier (if any)
+
+    // Skip whitespaces
+    while (str->at(pos) == ' ') {
+      pos++;
+    }
+
+    startSegment = pos;
+    while (str->at(pos) != '(' && str->at(pos) != ' ') {
+      pos++;
+    }
+    addSegment(startSegment, pos - startSegment, Identifier);
+  } else if (str->at(pos) == '(') {
+    // Probably some kind of CALLME();
+    addSegment(startSegment, pos - startSegment, Identifier);
+    pos++;
+  }
+
+  // Skip whitespaces
+  while (str->at(pos) == ' ') {
+    pos++;
+  }
+
+  // Either way, there should be a (..arguments..) section here (or nothing at all)
+  //TODO
+  while (str->at(pos) != '\n') { // REMOVE THIS
+    pos++;
+  }// REMOVE THIS
+  // TODO: HANDLE PARAMETERS (...) - possibly make it portable also for <> templates
+
+}
+
 void CPPLexer::defineStatement() {
   // A define statement is a particular one: it might span one or more lines
 
@@ -162,7 +215,7 @@ void CPPLexer::defineStatement() {
   //                 multiline
   //
 
-  int startSegment = pos;
+  size_t startSegment = pos;
   while (str->at(pos) != '(' && str->at(pos) != ' ') {
     pos++;
   }
@@ -175,6 +228,8 @@ void CPPLexer::defineStatement() {
     pos++;
   }
   addSegment(startSegment, pos - startSegment, Normal);
+  pos++; // Eat the last character
+
   // Do not add the \n to the comment (it will be handled outside)
 }
 
@@ -230,7 +285,6 @@ void CPPLexer::includeStatement() {
 
   // Skip whitespaces, a quoted string is expected
   while (str->at(pos) == ' ') {
-    // addSegment(pos, 1, Normal);
     pos++;
   }
 
@@ -285,9 +339,11 @@ void CPPLexer::globalScope() {
   // We're at global scope, this will end with EOF
   while (true) {
 
+    // const char *ptr = str->c_str() + pos; // debug
+
     // Skip newlines and whitespaces
     while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
-      // addSegment(pos, 1, Normal); // This might not be needed
+      // addSegment(pos, 1, Normal); // This is not needed
       pos++;
     }
 
@@ -316,6 +372,7 @@ void CPPLexer::globalScope() {
       continue;
     }
 
+    declarationOrDefinition(); // Last chance: something custom
 
     // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
     pos++;

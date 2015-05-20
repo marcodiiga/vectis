@@ -126,12 +126,6 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 
     auto el = pl.m_editorLines[0]; // DEBUG - assume only one editorLine
 
-    QString cc;
-    for (int i=0; i<el.m_characters.size(); ++i)
-      cc += el.m_characters[i];
-    if (cc.compare("#define MYMACRO test \\") == 0)
-      qDebug() << "lol";
-
     do {
       startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
 
