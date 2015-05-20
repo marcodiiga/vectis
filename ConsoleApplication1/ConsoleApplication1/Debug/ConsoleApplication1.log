@@ -1,0 +1,21 @@
+﻿Build started 14/04/2015 09:43:23.
+     1>Project "C:\Users\Admin\Desktop\ConsoleApplication1\ConsoleApplication1\ConsoleApplication1.vcxproj" on node 2 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /ZI /nologo /W3 /WX- /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _LIB /D _UNICODE /D UNICODE /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt ConsoleApplication1.cpp
+         ConsoleApplication1.cpp
+     1>c:\users\admin\desktop\consoleapplication1\consoleapplication1\consoleapplication1.cpp(12): error C2664: 'Expression<T>::Expression(const Expression<T> &)' : cannot convert argument 1 from 'LiteralExpression<int>' to 'const Expression<T> &'
+                 with
+                 [
+                     T=std::string
+                 ]
+                 Reason: cannot convert from 'LiteralExpression<int>' to 'const Expression<T>'
+                 with
+                 [
+                     T=std::string
+                 ]
+                 No user-defined-conversion operator available that can perform this conversion, or the operator cannot be called
+     1>Done Building Project "C:\Users\Admin\Desktop\ConsoleApplication1\ConsoleApplication1\ConsoleApplication1.vcxproj" (Build target(s)) -- FAILED.
+
+Build FAILED.
+
+Time Elapsed 00:00:00.71

@@ -2,6 +2,7 @@
 #include <QPainter>
 #include <QResizeEvent>
 
+#include <QDebug>
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
   QAbstractScrollArea(parent),
@@ -65,38 +66,112 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   // DEBUG drawing code
 
   painter.setPen(QPen(Qt::white));
+  auto setColor = [&painter](Style s) {
+    switch(s) {
+    case Comment: {
+      painter.setPen(QPen(Qt::green));
+    } break;
+    case Keyword: {
+      painter.setPen(QPen(Qt::blue));
+    } break;
+    case QuotedString: {
+      painter.setPen(QPen(Qt::red));
+    } break;
+    default: {
+      painter.setPen(QPen(Qt::white));
+    } break;
+    };
+  };
+
+
+
+
   QPointF startpoint(5, 20);
-  for(auto pl : m_document->m_physicalLines) {
+  size_t documentRelativePos = 0;
+  size_t lineRelativePos = 0;
+  auto& styleIt = m_document->m_styleDb.styleSegment.begin();
+  auto& styleEnd = m_document->m_styleDb.styleSegment.end();
+  size_t nextDestination = -1;
 
-    auto el = pl.m_editorLines[0];
-    for(auto ts : el.m_textSegments) {
 
-      QString tss(el.m_characters.data() + ts.start, ts.length);
-      startpoint.setX( 5 + ts.start * m_characterWidthPixels );
+  auto calculateNextDestination = [&]() {
+    // We can have 2 cases here:
+    // 1) Our position hasn't still reached a style segment (apply regular style and continue)
+    // 2) Our position is exactly on the start of a style segment (apply segment style and continue)
+    // If there are no other segments, use a regular style and continue till the end of the lines
 
-      switch (ts.style) {
-        case Normal: {
-          painter.setPen(QPen(Qt::white));
-        } break;
-        case Comment: {
-          painter.setPen(QPen(Qt::green));
-        } break;
-        case CPP_include:
-        case Keyword: {
-          painter.setPen(QPen(Qt::red));
-        } break;
-        case QuotedString: {
-          painter.setPen(QPen(Qt::yellow));
-        } break;
-        default: {
-          painter.setPen(QPen(Qt::white));
-        } break;
-      }
-
-      painter.drawText(startpoint, tss);
+    if (styleIt == styleEnd) { // No other segments
+      nextDestination = -1;
+      setColor( Normal );
+      return;
     }
 
-    startpoint.setX(5);
+    if(styleIt->start > documentRelativePos) { // Case 1
+      setColor( Normal );
+      nextDestination = styleIt->start;
+    } else if (styleIt->start == documentRelativePos) { // Case 2
+      setColor( styleIt->style );
+      nextDestination = styleIt->start + styleIt->count;
+      ++styleIt; // This makes sure our document relative position is never ahead of a style segment
+    }
+  };
+
+  // First time we don't have a destination set, just find one (if there's any)
+  calculateNextDestination();
+
+  for(auto pl : m_document->m_physicalLines) {
+
+    auto el = pl.m_editorLines[0]; // DEBUG - assume only one editorLine
+
+    do {
+      startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
+
+      // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
+      if (nextDestination == -1 ||
+          nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
+
+        // Multiple lines will have to be rendered, just render this till the end and continue
+
+        int charsRendered = 0;
+        if (el.m_characters.size() > 0) { // Empty lines must be skipped
+          QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+          painter.drawText(startpoint, ts);
+          charsRendered = ts.size();
+        }
+
+        lineRelativePos = 0; // Next editor line will just start from the beginning
+        documentRelativePos += charsRendered + 1 /* Plus a newline */;
+
+        break; // Go and fetch a new line for the next cycle
+      } else {
+
+        // We can reach the goal within this line
+
+        int charsRendered = 0;
+        if (el.m_characters.size() > 0) { // Empty lines must be skipped
+          QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
+          painter.drawText(startpoint, ts);
+          charsRendered = ts.size();
+        }
+
+        bool addNewLine = false; // Check if this goal also exhausted the current line entirely
+        if(nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
+          addNewLine = true;
+          lineRelativePos = 0; // Next editor line will just start from the beginning
+        } else
+          lineRelativePos += charsRendered;
+
+        documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's end
+
+        calculateNextDestination(); // Need a new goal
+
+        if (addNewLine)
+          break; // Go fetch a new line
+      }
+
+    } while(true);
+
+    // Move the rendering cursor (carriage-return)
     startpoint.setY(startpoint.y() + fontMetrics().height());
   }
 

@@ -5,6 +5,7 @@
 #include <QObject>
 #include <utility>
 #include <memory>
+#include <vector>
 
 class CodeTextEdit;
 
@@ -18,12 +19,6 @@ class CodeTextEdit;
 //   EditorLine {
 //     An editor line is a line for the editor, i.e. a line that might be the result
 //     of wrapping or be equivalent to a physical line. EditorLine stores the characters
-//     and a vector of StyledTextSegment
-//
-//     StyledTextSegment {
-//       A StyledTextSegment is a text segment (e.g. a keyword or a variable name) with an
-//       associated style filled by the appropriate lexer
-//     }
 //   }
 // }
 
@@ -31,7 +26,6 @@ struct EditorLine {
   EditorLine (QString str);
 
   std::vector<QChar> m_characters;
-  std::vector<StyledTextSegment> m_textSegments;
 };
 
 struct PhysicalLine {
@@ -75,6 +69,7 @@ private:
     std::unique_ptr<LexerBase> m_lexer;
     bool m_needReLexing; // Whether the document needs re-lexing
     std::vector<PhysicalLine> m_physicalLines;
+    StyleDatabase m_styleDb;
 };
 
 #endif // DOCUMENT_H

@@ -101,106 +101,176 @@ namespace { // Functions reserved for this TU's internal use
     set.emplace( "xor_eq" );
     set.emplace( "nullptr" );
   }
+
+
+
 }
 
 CPPLexer::CPPLexer() :
-  LexerBase(CPPLexerType),
-  m_state(CODE)
+  LexerBase(CPPLexerType)
 {
-  m_segmentInProgress.reserve (40); // You're coding it wrong if you need more than 40 chars
-                                    // per identifier
   populateReservedKeywords (m_reservedKeywords);
 }
 
 void CPPLexer::reset() {
   // Reset this lexer's internal state to start another lexing session
-  m_state = CODE;
-  m_segmentInProgress.clear();
 }
 
-void CPPLexer::lexLine(QString &line, std::vector<StyledTextSegment> &ts) {
-  qDebug() << "[CPP]lexing for line " << line;
+void CPPLexer::lexInput(std::string& input, StyleDatabase& sdb) {
 
-  auto writeOutSegment = [&](int i, Style s) {
-    int segmentLen = m_segmentInProgress.size();
-    if (segmentLen > 0) { // If we had some characters for a token, now render it a segment
+  str = &input;
+  sdb.styleSegment.clear(); // Relex everything // TODO - lex from a position forward?
+  styleDb = &sdb;
+  pos = 0;
 
-      // Override style if this is a single reserved keyword
-      if ( m_reservedKeywords.find( m_segmentInProgress.toStdString() ) != m_reservedKeywords.end() )
-        s = Keyword;
+  try {
+    globalScope();
+  }
+  catch (std::out_of_range&) {
+    qDebug() << "Parsing terminated!";
+  }
+}
 
-      ts.emplace_back(i - segmentLen, segmentLen, s);
-      m_segmentInProgress.clear();
-    }
-  };
+// Utility function: adds a segment to the style database
+void CPPLexer::addSegment(size_t pos, size_t len, Style style) {
+  styleDb->styleSegment.emplace_back(pos, len, style);
+}
 
-  for(int i=0; i<line.size(); ++i) {
-    const QChar c = line[i];
 
-    if (m_state == INCLUDE) {
-      if (c != '"' && c != '<') {
-        m_segmentInProgress += c;
-        continue;
-      } else {
-        writeOutSegment (i, CPP_include);
-        m_state = STRING;
-        m_stringStartCharacter = c;
-        m_segmentInProgress += c;
-        continue;
-      }
-    }
+void CPPLexer::lineCommentStatement() {
+  // A statement spans until a newline is found (or EOF)
 
-    if (m_state == STRING) {
-      if (c != m_stringStartCharacter) {
-        m_segmentInProgress += c;
-        continue; // No need to check anything else
-      } else {
-        // End of this string segment reached
-        m_state = CODE;
-        m_segmentInProgress += c;
-        writeOutSegment (i+1, QuotedString);
-        continue;
-      }
-    }
+  size_t startSegment = pos;
 
-    if(c == '/' && line[i+1] == '/' && m_state != COMMENT && m_state != MULTILINECOMMENT) {
-      // Add everything left as a comment segment
-      ts.emplace_back(i, line.size()-i, Comment);
-      m_state = CODE; // Single line comments don't last more than one line
-      m_segmentInProgress.clear();
-      return;
-    }
+  // Skip everything until \n
+  while (str->at(pos) != '\n') {
+    pos++;
+  }
+  // Do not add the \n to the comment (it will be handled outside)
 
-    if(c == '"' && m_state == CODE) { // Start a string section
-      m_state = STRING;
+  addSegment(startSegment, pos - startSegment, Comment);
+}
 
-      // Before starting the new string segment, clear the previous one if there's any
-      if (m_segmentInProgress.size() > 0)
-        writeOutSegment (i, Normal);
 
-      m_segmentInProgress += c;
-      continue;
-    }
+void CPPLexer::usingStatement() {
+  // A statement spans until a newline is found (or EOF)
 
-    if(c == '#' && m_state == CODE &&
-       QString(line.data()+i+1).startsWith("include")) { // Start an include
-      m_state = INCLUDE;
-      writeOutSegment (i, Normal);
-      m_segmentInProgress += c;
-      continue;
-    }
-    // TODO: handle macros
+  addSegment(pos, 5, Keyword); // using
+  pos += 5;
 
-    if(isWhitespace(c)) { // Skip whitespaces and signal the end of a token
-      writeOutSegment (i, Normal);
-      continue;
-    } else
-      m_segmentInProgress += c;
+  // Skip whitespaces
+  while (str->at(pos) == ' ') {
+    pos++;
   }
 
-  writeOutSegment (line.size(), Normal);
+  if (str->substr(pos, 9).compare("namespace") == 0) {
+    addSegment(pos, 9, Keyword); // namespace
+    pos += 9;
+  }
 
-  // 1) Keep a style status (e.g. comment? keyword? etc..)
-  // 2) Separate words with spaces and ; (terminators)
-  // 3) Apply the right style (perhaps also store where a function/class ends/begins.. do it later)
+  // Skip whitespaces
+  while (str->at(pos) == ' ') {
+    pos++;
+  }
+
+  // Whatever identifier we've found until \n
+  size_t startSegment = pos;
+  while (str->at(pos) != '\n') {
+    pos++;
+  }
+  addSegment(startSegment, pos - startSegment, Normal);
+}
+
+void CPPLexer::includeStatement() {
+  // A statement spans until a newline is found (or EOF)
+
+  addSegment(pos, 8, Keyword); // #include
+  pos += 8;
+
+  // Skip whitespaces, a quoted string is expected
+  while (str->at(pos) == ' ') {
+    // addSegment(pos, 1, Normal);
+    pos++;
+  }
+
+  if (str->at(pos) == '"') {
+    size_t segmentStart = pos;
+    pos++;
+
+    while (str->at(pos) != '"') {
+      if (str->at(pos) == '\n')
+        return; // Interrupt if a newline is found
+      pos++;
+    }
+    pos++;
+
+    addSegment(segmentStart, pos - segmentStart, QuotedString);
+  }
+
+  if (str->at(pos) == '<') {
+    size_t segmentStart = pos;
+    pos++;
+
+    while (str->at(pos) != '>') {
+      if (str->at(pos) == '\n')
+        return; // Interrupt if a newline is found
+      pos++;
+    }
+    pos++;
+
+    addSegment(segmentStart, pos - segmentStart, QuotedString);
+  }
+}
+
+void CPPLexer::multilineComment() {
+  size_t segmentStart = pos;
+
+  pos += 2; // Add the '/*' characters
+
+  // Ignore everything until a */ sequence
+  while (str->at(pos) != '*' && str->at(pos+1) != '/')
+    pos++;
+
+  // Add '*/'
+  pos += 2;
+
+  addSegment(segmentStart, pos - segmentStart, Comment);
+
+  return; // Return to whatever scope we were in
+}
+
+void CPPLexer::globalScope() {
+
+  // We're at global scope, this will end with EOF
+  while (true) {
+
+    // Skip newlines and whitespaces
+    while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
+      // addSegment(pos, 1, Normal); // This might not be needed
+      pos++;
+    }
+
+    if (str->at(pos) == '/' && str->at(pos + 1) == '*') { // Multiline C-style string
+      multilineComment();
+      continue;
+    }
+
+    if (str->at(pos) == '/' && str->at(pos + 1) == '/') { // Line comment
+      lineCommentStatement();
+      continue;
+    }
+
+    if (str->at(pos) == '#' && str->substr(pos + 1, 7).compare("include") == 0) { // #include
+      includeStatement();
+      continue;
+    }
+
+    if (str->substr(pos, 5).compare("using") == 0) { // using
+      usingStatement();
+      continue;
+    }
+
+    // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
+    pos++;
+  }
 }

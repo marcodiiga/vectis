@@ -50,7 +50,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
   ui->codeTextEditArea->addWidget( m_customCodeEdit.get() );
   // Create a document, load a file and assign it to the code edit control (i.e. DEBUG - try to render it)
   m_documents.emplace_back (std::make_unique<Document>(*m_customCodeEdit));
-  m_documents[0]->loadFromFile( "../vectis/TestData/BasicBlock.cpp" );
+  m_documents[0]->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
   m_documents[0]->applySyntaxHighlight( CPP );
   m_customCodeEdit->loadDocument( m_documents[0].get() );
 

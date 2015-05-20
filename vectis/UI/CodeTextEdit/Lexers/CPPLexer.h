@@ -9,16 +9,28 @@ class CPPLexer : public LexerBase {
 public:
   CPPLexer();
 
-  void reset();
-  void lexLine(QString& line, std::vector<StyledTextSegment>& ts);
+  void reset() override;
+  void lexInput(std::string& input, StyleDatabase& sdb) override;
 
 private:
-  // States the lexer can find itself into
-  enum LexerStates {CODE, STRING, COMMENT, MULTILINECOMMENT, INCLUDE};
-  LexerStates m_state;
+  //// States the lexer can find itself into
+  //enum LexerStates {CODE, STRING, COMMENT, MULTILINECOMMENT, INCLUDE};
+  //LexerStates m_state;
   std::unordered_set<std::string> m_reservedKeywords;
-  QString m_segmentInProgress; // A cache variable to keep in-progress segments
-  QChar m_stringStartCharacter; // An include string can be started by " or <
+
+  // The contents of the document and the position we're lexing at
+  std::string *str;
+  size_t pos;
+  StyleDatabase *styleDb;
+
+  void addSegment(size_t pos, size_t len, Style style);
+
+  void lineCommentStatement();
+  void usingStatement();
+  void includeStatement();
+  void multilineComment();
+  void globalScope();
+
 };
 
 #endif // CPPLEXER_H

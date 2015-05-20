@@ -3,6 +3,7 @@
 #include <UI/CodeTextEdit/Lexers/Lexer.h>
 #include <QFile>
 #include <QTextStream>
+#include <regex>
 
 #include <QDebug>
 
@@ -27,8 +28,12 @@ bool Document::loadFromFile(QString file) {
   QTextStream in(&f);
   // Load the entire file into memory (expensive but necessary)
   m_plainText = in.readAll();
-
   f.close();
+
+  // This is also necessary: normalize all line endings to \n (Unix-style)
+  std::regex invalidEnding("\r\n|\r");
+  m_plainText.fromStdString(std::regex_replace(m_plainText.toStdString(), invalidEnding, "\n"));
+
   return true;
 }
 
@@ -36,7 +41,7 @@ void Document::applySyntaxHighlight(SyntaxHighlight s) {
   m_needReLexing = false;
   switch(s) {
     case NONE: {
-      if (m_lexer) {
+      if (m_lexer) { // Check if there were a lexer before (i.e. the smart pointer was set)
         m_lexer.release();
         m_needReLexing = true; // Syntax has been changed, re-lex the document at the next recalculate
       }
@@ -67,13 +72,14 @@ void Document::setWrapWidth(int width) {
 void Document::recalculateDocumentLines () {
   m_firstDocumentRecalculate = false;
 
+  if (m_needReLexing) {
+    m_lexer->lexInput(m_plainText.toStdString(), m_styleDb);
+    m_needReLexing = false;
+  }
+
   // Scan each line (until a newline is found)
   QTextStream ss(&m_plainText);
   QString line;
-  if (m_needReLexing) {
-    // This document needs re-lexing, reset the lexer we have
-    m_lexer->reset();
-  }
   do {
     line = ss.readLine();
     if (line.isNull())
@@ -87,11 +93,6 @@ void Document::recalculateDocumentLines () {
 
     } else { // No wrap or the line fits perfectly within the wrap limits
       EditorLine el(line);
-
-      if (m_needReLexing) { // Generate TextSegments if relexing is needed
-        m_lexer->lexLine(line, el.m_textSegments);
-      }
-
       PhysicalLine line(std::move(el));
       m_physicalLines.emplace_back( std::move(line) );
     }

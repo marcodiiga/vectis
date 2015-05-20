@@ -22,11 +22,16 @@ enum Style {
   CPP_include
 };
 
-struct StyledTextSegment {
-  StyledTextSegment(int s, int l, Style st) : start(s), length(l), style(st) {}
-  int start;
-  int length;
-  Style style = Normal; // Style associated with this segment
+struct StyleDatabase {
+  struct StyleSegment {
+    StyleSegment(size_t s, size_t c, Style st) : start(s), count(c), style(st) {}
+    size_t start;
+    size_t count;
+    Style style;
+  };
+
+  // Stores the beginning and count of characters per each styled segment
+  std::vector<StyleSegment> styleSegment;
 };
 
 // An abstract base class for all the Lexers to implement
@@ -39,7 +44,7 @@ public:
   static LexerBase *createLexerOfType(LexerType t);
 
   virtual void reset() = 0;
-  virtual void lexLine(QString& line, std::vector<StyledTextSegment>& ts) = 0;
+  virtual void lexInput(std::string& input, StyleDatabase& sdb) = 0;
 
 private:
   LexerType m_type;
