@@ -69,13 +69,16 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   auto setColor = [&painter](Style s) {
     switch(s) {
     case Comment: {
-      painter.setPen(QPen(Qt::green));
+      painter.setPen(QPen(Qt::gray));
     } break;
     case Keyword: {
       painter.setPen(QPen(Qt::blue));
     } break;
     case QuotedString: {
       painter.setPen(QPen(Qt::red));
+    } break;
+    case Identifier: {
+      painter.setPen(QPen(Qt::green));
     } break;
     default: {
       painter.setPen(QPen(Qt::white));
@@ -122,6 +125,12 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   for(auto pl : m_document->m_physicalLines) {
 
     auto el = pl.m_editorLines[0]; // DEBUG - assume only one editorLine
+
+    QString cc;
+    for (int i=0; i<el.m_characters.size(); ++i)
+      cc += el.m_characters[i];
+    if (cc.compare("#define MYMACRO test \\") == 0)
+      qDebug() << "lol";
 
     do {
       startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );

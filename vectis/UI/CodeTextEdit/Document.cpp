@@ -3,7 +3,7 @@
 #include <UI/CodeTextEdit/Lexers/Lexer.h>
 #include <QFile>
 #include <QTextStream>
-#include <regex>
+#include <QRegExp>
 
 #include <QDebug>
 
@@ -31,8 +31,11 @@ bool Document::loadFromFile(QString file) {
   f.close();
 
   // This is also necessary: normalize all line endings to \n (Unix-style)
-  std::regex invalidEnding("\r\n|\r");
-  m_plainText.fromStdString(std::regex_replace(m_plainText.toStdString(), invalidEnding, "\n"));
+  QRegExp invalidEnding("\r\n|\r");
+  m_plainText.replace(invalidEnding, "\n");
+  // For simplicity convert all tabs into 4 spaces and just deal with those
+  QRegExp tabs("\t");
+  m_plainText.replace(tabs, "    ");
 
   return true;
 }
@@ -77,6 +80,9 @@ void Document::recalculateDocumentLines () {
     m_needReLexing = false;
   }
 
+  // Drop previous lines
+  m_physicalLines.clear();
+
   // Scan each line (until a newline is found)
   QTextStream ss(&m_plainText);
   QString line;
@@ -89,7 +95,7 @@ void Document::recalculateDocumentLines () {
         line.count() * m_codeTextEdit.getCharacterWidthPixels() > m_wrapWidth) {
       // We have a wrap and the line is too big - WRAP IT
 
-      // TODO
+      // TODO - beware tabs (they count more than 1)
 
     } else { // No wrap or the line fits perfectly within the wrap limits
       EditorLine el(line);

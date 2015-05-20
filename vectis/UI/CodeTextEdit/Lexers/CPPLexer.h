@@ -25,6 +25,7 @@ private:
 
   void addSegment(size_t pos, size_t len, Style style);
 
+  void defineStatement();
   void lineCommentStatement();
   void usingStatement();
   void includeStatement();

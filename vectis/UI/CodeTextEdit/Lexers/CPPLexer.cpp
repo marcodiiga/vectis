@@ -1,5 +1,5 @@
 #include <UI/CodeTextEdit/Lexers/CPPLexer.h>
-
+#include <regex>
 #include <QDebug>
 
 namespace { // Functions reserved for this TU's internal use
@@ -131,11 +131,52 @@ void CPPLexer::lexInput(std::string& input, StyleDatabase& sdb) {
   }
 }
 
+
+//==---------------------------------------------------------------------------==//
+//                         Scopes handling functions                             //
+//==---------------------------------------------------------------------------==//
+
+
 // Utility function: adds a segment to the style database
 void CPPLexer::addSegment(size_t pos, size_t len, Style style) {
   styleDb->styleSegment.emplace_back(pos, len, style);
 }
 
+void CPPLexer::defineStatement() {
+  // A define statement is a particular one: it might span one or more lines
+
+  addSegment(pos, 7, Keyword); // #define
+  pos += 7;
+
+  // Skip whitespaces
+  while (str->at(pos) == ' ') {
+    pos++;
+  }
+
+  // Now we might have something like
+  // #define MYMACRO XX
+  // or
+  // #define MYMACRO(a,b,c..) something
+  // or even
+  // #define MYMACRO XX \
+  //                 multiline
+  //
+
+  int startSegment = pos;
+  while (str->at(pos) != '(' && str->at(pos) != ' ') {
+    pos++;
+  }
+  addSegment(startSegment, pos - startSegment, Identifier);
+
+  // Regular style for all the rest. A macro, even multiline, ends when a newline not preceded
+  // by \ is found
+  startSegment = pos;
+  while (!(str->at(pos) != '\\' && str->at(pos+1) == '\n')) {
+    pos++;
+  }
+  addSegment(startSegment, pos - startSegment, Normal);
+  // Do not add the \n to the comment (it will be handled outside)
+}
 
 void CPPLexer::lineCommentStatement() {
   // A statement spans until a newline is found (or EOF)
@@ -265,10 +306,16 @@ void CPPLexer::globalScope() {
       continue;
     }
 
+    if (str->at(pos) == '#' && str->substr(pos + 1, 6).compare("define") == 0) { // #define
+      defineStatement();
+      continue;
+    }
+
     if (str->substr(pos, 5).compare("using") == 0) { // using
       usingStatement();
       continue;
     }
+
 
     // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
     pos++;

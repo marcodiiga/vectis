@@ -17,6 +17,7 @@ enum Style {
   Keyword,
   Comment,
   QuotedString,
+  Identifier, // E.g. a function name (fully qualified or unqualified) or a macro
 
   //==-- C++ specific styles --==//
   CPP_include
