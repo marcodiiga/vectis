@@ -65,7 +65,7 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 
   // DEBUG drawing code
 
-  painter.setPen(QPen(Qt::white));
+  painter.setPen(QPen(Qt::white)); // TODO These colors suck. Find something better.
   auto setColor = [&painter](Style s) {
     switch(s) {
     case Comment: {
@@ -91,6 +91,12 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
     } break;
     };
   };
+
+
+  // ps. to relink the scrollbar:
+  // 1) documentSizeChanged should be emitted every time the document has a different number of editor lines
+  // 2) scrolling is just about drawing offsets, have the offsets set by the scrollbar be reflected here
+  // 3) if you want a minimap, draw everything. But do NOT draw everything each time. We just need to render the lines that are in sight
 
 
 
