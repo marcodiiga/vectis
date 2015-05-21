@@ -18,6 +18,8 @@ enum Style {
   Comment,
   QuotedString,
   Identifier, // E.g. a function name (fully qualified or unqualified) or a macro
+  FunctionCall,
+  Literal,
 
   //==-- C++ specific styles --==//
   CPP_include

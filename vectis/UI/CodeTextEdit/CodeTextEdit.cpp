@@ -80,6 +80,12 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
     case Identifier: {
       painter.setPen(QPen(Qt::green));
     } break;
+    case FunctionCall: {
+      painter.setPen(QPen(Qt::cyan));
+    } break;
+    case Literal: {
+      painter.setPen(QPen(Qt::darkRed));
+    } break;
     default: {
       painter.setPen(QPen(Qt::white));
     } break;

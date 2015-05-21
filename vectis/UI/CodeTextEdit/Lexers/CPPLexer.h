@@ -4,6 +4,7 @@
 #include <UI/CodeTextEdit/Lexers/Lexer.h>
 #include <unordered_set>
 #include <string>
+#include <stack>
 
 class CPPLexer : public LexerBase {
 public:
@@ -17,6 +18,9 @@ private:
   //enum LexerStates {CODE, STRING, COMMENT, MULTILINECOMMENT, INCLUDE};
   //LexerStates m_state;
   std::unordered_set<std::string> m_reservedKeywords;
+  std::stack<int> m_scopesStack;
+  int m_classKeywordActiveOnScope; // This signals that there's a 'class' keyword pending
+  std::vector<int> m_adaptPreviousSegments;
 
   // The contents of the document and the position we're lexing at
   std::string *str;
@@ -25,6 +29,7 @@ private:
 
   void addSegment(size_t pos, size_t len, Style style);
 
+  void classDeclarationOrDefinition();
   void declarationOrDefinition();
   void defineStatement();
   void lineCommentStatement();

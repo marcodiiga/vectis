@@ -110,10 +110,15 @@ CPPLexer::CPPLexer() :
   LexerBase(CPPLexerType)
 {
   populateReservedKeywords (m_reservedKeywords);
+  m_classKeywordActiveOnScope = -2;
 }
 
 void CPPLexer::reset() {
   // Reset this lexer's internal state to start another lexing session
+  m_classKeywordActiveOnScope = -2;
+  std::stack<int> empty;
+  std::swap( m_scopesStack, empty ); // Dumb clearing mechanism
+  m_adaptPreviousSegments.clear();
 }
 
 void CPPLexer::lexInput(std::string& input, StyleDatabase& sdb) {
@@ -142,56 +147,245 @@ void CPPLexer::addSegment(size_t pos, size_t len, Style style) {
   styleDb->styleSegment.emplace_back(pos, len, style);
 }
 
-void CPPLexer::declarationOrDefinition() { // A global scope declaration or definition
-  // of a function (or some macro-ed stuff e.g. CALLME();)
+void CPPLexer::classDeclarationOrDefinition() {
+  // TODO: fw decl or def
+}
+
+void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
+  // of a function, class (or some macro-ed stuff e.g. CALLME();) or local variables
 
   // Skip whitespaces
   while (str->at(pos) == ' ') {
     pos++;
   }
 
-  // A return type or identifier is expected here
+ const char *ptr = str->c_str() + pos; // debug
+
+  // Handle any keyword or identifier until a terminator character
+  bool foundSegment = false;
   size_t startSegment = pos;
-  while (str->at(pos) != ' ' && str->at(pos) != '(') {
+  while (    (str->at(pos) >= '0' && str->at(pos) <= '9')
+          || (str->at(pos) >= 'A' && str->at(pos) <= 'Z')
+          || (str->at(pos) >= 'a' && str->at(pos) <= 'z')
+          ||  str->at(pos) == '_') {
     pos++;
   }
-  if (str->at(pos) == ' ') { // Probably a return type (and it might be a keyword)
+  if (pos > startSegment) { // We found something
     Style s = Normal;
-    if(m_reservedKeywords.find(str->substr(startSegment, pos - startSegment)) !=
-       m_reservedKeywords.end())
+
+    // It might be a reserved keyword
+    std::string segment = str->substr(startSegment, pos - startSegment);
+    if (m_reservedKeywords.find(segment) != m_reservedKeywords.end()) {
       s = Keyword;
+      if ( (segment.compare("class") == 0 || segment.compare("struct") == 0) &&
+           m_classKeywordActiveOnScope == -2 /* No inner class support for now */)
+        m_classKeywordActiveOnScope = -1; // We keep track of this since a class scope is *not* a local
+        // scope, but rather should be treated as the global scope. If we encounter a ';' before any '{', this
+        // value gets back to -2, i.e. 'no class keyword active'. If we join a scope, this gets set to the
+        // scope number and from that point forward whenever we're in that scope, no function call can be
+        // used (only declarations). If we pop out of that function scope, it returns to -2.
+    } else {
+
+      // Or perhaps a literal (e.g. 11)
+      std::regex lit("\\d+[uUlL]?[ull]?[ULL]?[UL]?[ul]?[ll]?[LL]?");
+      std::regex lit2("0[xbX][\\da-fA-F]+");
+      if(std::regex_match(segment, lit) || std::regex_match(segment, lit2))
+        s = Literal;
+
+    }
+
+    // Assign a Keyword or Normal style and later, if we find (, make it a function declaration
     addSegment(startSegment, pos - startSegment, s);
-    pos++;
-
-    // Now add the real identifier (if any)
-
-    // Skip whitespaces
-    while (str->at(pos) == ' ') {
-      pos++;
-    }
-
-    startSegment = pos;
-    while (str->at(pos) != '(' && str->at(pos) != ' ') {
-      pos++;
-    }
-    addSegment(startSegment, pos - startSegment, Identifier);
-  } else if (str->at(pos) == '(') {
-    // Probably some kind of CALLME();
-    addSegment(startSegment, pos - startSegment, Identifier);
+    foundSegment = true;
+  }
+  // Skip whitespaces and stuff that we're not interested in
+  while (str->at(pos) == ' ' || str->at(pos) == '\n') {
     pos++;
   }
 
-  // Skip whitespaces
-  while (str->at(pos) == ' ') {
-    pos++;
+  if (str->at(pos) == '(') {
+
+    // Check for the scopes stack and, if we're not in a global scope, mark this as function call.
+    // Notice that class member functions aren't marked as function calls but rather as identifiers.
+    if (foundSegment && !m_scopesStack.empty() && m_classKeywordActiveOnScope != m_scopesStack.top() &&
+        styleDb->styleSegment[styleDb->styleSegment.size()-1].style != Keyword) {
+
+      styleDb->styleSegment[styleDb->styleSegment.size()-1].style = FunctionCall;
+
+      // Also set the same style for all the linked previous segments
+      for(auto i : m_adaptPreviousSegments)
+        styleDb->styleSegment[i].style = FunctionCall;
+      m_adaptPreviousSegments.clear();
+
+    } else if (foundSegment && (m_scopesStack.empty() || m_classKeywordActiveOnScope == m_scopesStack.top() ) &&
+             styleDb->styleSegment[styleDb->styleSegment.size()-1].style != Keyword) {
+
+      styleDb->styleSegment[styleDb->styleSegment.size()-1].style = Identifier;
+
+      // Also set the same style for all the linked previous segments
+      for(auto i : m_adaptPreviousSegments)
+        styleDb->styleSegment[i].style = Identifier;
+      m_adaptPreviousSegments.clear();
+    }
+
+    pos++; // Eat the '('
   }
 
-  // Either way, there should be a (..arguments..) section here (or nothing at all)
-  //TODO
-  while (str->at(pos) != '\n') { // REMOVE THIS
-    pos++;
-  }// REMOVE THIS
-  // TODO: HANDLE PARAMETERS (...) - possibly make it portable also for <> templates
+  if (str->at(pos) == ':' && str->at(pos+1) == ':') { // :: makes the previous segment part of the new one
+    if (styleDb->styleSegment.size() > 0)
+      m_adaptPreviousSegments.push_back(styleDb->styleSegment.size()-1);
+  }
+
+  const char *ptr2 = str->c_str() + pos; // debug
+
+  if (foundSegment == false) { // We couldn't find a normal identifier
+    if (str->at(pos) == '{') { // Handle entering/exiting scopes
+      pos++;
+      m_scopesStack.push(m_scopesStack.size());
+
+      if (m_classKeywordActiveOnScope == -1)
+        m_classKeywordActiveOnScope = m_scopesStack.top(); // Joined a class scope
+
+    } else if (str->at(pos) == '}') {
+      pos++;
+
+      if (m_classKeywordActiveOnScope == m_scopesStack.top())
+        m_classKeywordActiveOnScope = -2; // Exited a class scope
+
+      m_scopesStack.pop();
+    } else if (str->at(pos) == '"' || str->at(pos) == '\'') {
+
+      // A quoted string
+      char startCharacter = str->at(pos);
+      startSegment = pos++;
+      while(str->at(pos) != startCharacter)
+        ++pos;
+      pos++; // Include the terminal character
+
+      addSegment(startSegment, pos - startSegment, QuotedString);
+    } else {
+
+      // We really can't identify this token, just skip it and assign a regular style
+
+      if (str->at(pos) == ';' && m_classKeywordActiveOnScope == -1)
+        m_classKeywordActiveOnScope = -2; // Deactivate the class scope override
+
+      pos++;
+    }
+  }
+
+
+
+
+
+
+
+  //    // Handle any other keyword or identifier (this could be a function name)
+  //    bool foundSegment = false;
+  //    size_t startSegment = pos;
+  //    while (str->at(pos) != ' ' && str->at(pos) != '(' && str->at(pos) != ';' && str->at(pos) != '{') {
+  //      pos++;
+  //    }
+  //    if (pos > startSegment) { // We found something else
+  //      // This might be a declaration if we find another pair of parenthesis or a variable name.
+  //      // Assign a Normal style and later, if we find (, make it a function declaration
+  //      addSegment(startSegment, pos - startSegment, Normal);
+  //      foundSegment = true;
+  //    }
+  //    // Skip whitespaces and stuff that we're not interested in
+  //    while (str->at(pos) == ' ' || str->at(pos) == '\n') {
+  //      pos++;
+  //    }
+
+  //    if(str->at(pos) == ';') {
+  //      pos++;
+  //      break; // Hit a terminator
+  //    }
+
+
+
+
+//  // First check if this is a class forward declaration or definition
+//  if (str->substr(pos, 5).compare("class") == 0) { // class
+//    classDeclarationOrDefinition();
+//    return;
+//  }
+
+
+
+//  do { // Continuously parse identifiers/arguments until we hit a terminator
+
+//    // Handle any other keyword or identifier (this could be a function name)
+//    bool foundSegment = false;
+//    size_t startSegment = pos;
+//    while (str->at(pos) != ' ' && str->at(pos) != '(' && str->at(pos) != ';' && str->at(pos) != '{') {
+//      pos++;
+//    }
+//    if (pos > startSegment) { // We found something else
+//      // This might be a declaration if we find another pair of parenthesis or a variable name.
+//      // Assign a Normal style and later, if we find (, make it a function declaration
+//      addSegment(startSegment, pos - startSegment, Normal);
+//      foundSegment = true;
+//    }
+//    // Skip whitespaces and stuff that we're not interested in
+//    while (str->at(pos) == ' ' || str->at(pos) == '\n') {
+//      pos++;
+//    }
+
+//    if(str->at(pos) == ';') {
+//      pos++;
+//      break; // Hit a terminator
+//    }
+
+//    const char *ptr = str->c_str() + pos; // debug
+
+//    // Handle any (..) section
+//    if (str->at(pos) == '(') {
+//      // Global scope function call
+
+//      // This also means the previous segment was a declaration or a function call (if we're inside a function)
+//      if (foundSegment && m_scopesStack.empty())
+//        styleDb->styleSegment[styleDb->styleSegment.size()-1].style = Identifier;
+//      else if (foundSegment) // We're in an inner scope
+//        styleDb->styleSegment[styleDb->styleSegment.size()-1].style = FunctionCall;
+
+//      while (str->at(pos) != ')' && str->at(pos) != ';') {
+
+//        if (str->at(pos) == '{') {
+//          pos++;
+//          m_scopesStack.push(m_scopesStack.size());
+//        }
+
+//        if (str->at(pos) == '}') {
+//          pos++;
+//          m_scopesStack.pop();
+//          if (m_scopesStack.empty())
+//            break;
+//        }
+
+//        pos++;
+//      }
+//      pos++; // Eat the )
+//    }
+//    // Skip whitespaces and stuff that we're not interested in
+//    while (str->at(pos) == ' ' || str->at(pos) == '\n') {
+//      pos++;
+//    }
+
+//    // There might be a function body at this point, if there is: handle it
+//    if (str->at(pos) == '{') {
+//      pos++;
+//      m_scopesStack.push(m_scopesStack.size());
+//    }
+
+//    if (str->at(pos) == '}') {
+//      pos++;
+//      m_scopesStack.pop();
+//      if (m_scopesStack.empty())
+//        break;
+//    }
+
+//  } while (true);
 
 }
 
@@ -339,7 +533,7 @@ void CPPLexer::globalScope() {
   // We're at global scope, this will end with EOF
   while (true) {
 
-    // const char *ptr = str->c_str() + pos; // debug
+     const char *ptr = str->c_str() + pos; // debug
 
     // Skip newlines and whitespaces
     while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
@@ -375,6 +569,6 @@ void CPPLexer::globalScope() {
     declarationOrDefinition(); // Last chance: something custom
 
     // TODO simple/unrecognized identifiers (and increment pos!! FGS!)
-    pos++;
+    //pos++;
   }
 }
