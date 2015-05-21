@@ -82,6 +82,8 @@ void Document::recalculateDocumentLines () {
 
   // Drop previous lines
   m_physicalLines.clear();
+  m_numberOfEditorLines = 0;
+  m_maximumCharactersLine = 0;
 
   // Scan each line (until a newline is found)
   QTextStream ss(&m_plainText);
@@ -98,15 +100,20 @@ void Document::recalculateDocumentLines () {
       // TODO - beware tabs (they count more than 1)
 
     } else { // No wrap or the line fits perfectly within the wrap limits
+
       EditorLine el(line);
-      PhysicalLine line(std::move(el));
-      m_physicalLines.emplace_back( std::move(line) );
+      PhysicalLine phLine(std::move(el));
+      m_physicalLines.emplace_back( std::move(phLine) );
+
+      ++m_numberOfEditorLines; // One more EditorLine
+      if (line.size() > m_maximumCharactersLine)
+        m_maximumCharactersLine = line.size();
     }
 
   } while(line.isNull() == false);
 
   // At this point the PhysicalLines vector has been populated (or is still empty)
-  // TODO something else
+  // and the document structure is stored in memory
 }
 
 

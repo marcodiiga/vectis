@@ -44,7 +44,16 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
 
 void CodeTextEdit::loadDocument(Document *doc) {
   m_document = doc;
-  // TODO: update the view
+
+  // Calculate the new document size
+  m_document->recalculateDocumentLines();
+
+  QSizeF newSize;
+  newSize.setHeight( m_document->m_numberOfEditorLines );
+  newSize.setWidth ( m_document->m_maximumCharactersLine );
+
+  // Emit a documentSizeChanged signal. This will trigger scrollbars resizing
+  emit documentSizeChanged( newSize, fontMetrics().height() );
 }
 
 int CodeTextEdit::getViewportWidth() const {
@@ -94,14 +103,15 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 
 
   // ps. to relink the scrollbar:
-  // 1) documentSizeChanged should be emitted every time the document has a different number of editor lines
+  // 1) documentSizeChanged should be emitted every time the document has a different number of editor lines -> DONE
   // 2) scrolling is just about drawing offsets, have the offsets set by the scrollbar be reflected here
   // 3) if you want a minimap, draw everything. But do NOT draw everything each time. We just need to render the lines that are in sight
 
 
-
+  //qDebug() << m_sliderValue * fontMetrics().height();
 
   QPointF startpoint(5, 20);
+  startpoint.setY(startpoint.y() - m_sliderValue * fontMetrics().height());
   size_t documentRelativePos = 0;
   size_t lineRelativePos = 0;
   auto& styleIt = m_document->m_styleDb.styleSegment.begin();
@@ -195,6 +205,22 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
   if (m_document != nullptr)
     m_document->setWrapWidth(evt->size().width());
+
+  // Even if the document's size might not have changed, we still need to fire a documentSizeChanged
+  // event since scrollbars use this also to calculate the maximum number of lines our viewport can display
+  QSizeF newSize;
+  qreal lineHeight = fontMetrics().height();
+  newSize.setHeight( m_document->m_numberOfEditorLines );
+  newSize.setWidth ( m_document->m_maximumCharactersLine );
+
+  // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
+  emit documentSizeChanged( newSize, lineHeight );
+}
+
+void CodeTextEdit::verticalSliderValueChanged (int value) {
+  // This method is called each time there's a change in the vertical slider and we need to refresh the view
+  m_sliderValue = value;
+  repaint();
 }
 
 /*

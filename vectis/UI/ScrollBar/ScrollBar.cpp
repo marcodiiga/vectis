@@ -50,15 +50,9 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
                               width:15px;        \
                            }"));
 
-
-    // TODO
-    // TODO: we need a documentSizeChanged event!! CodeTextEdit NEEDS to relink this!
-    // TODO
-    //
     // Only way to detect when line wrapping inserts additional lines is through documentSizeChanged()
-    //connect( m_parent->document()->documentLayout(), SIGNAL(documentSizeChanged(const QSizeF&)),
-    //        this, SLOT(documentSizeChanged(const QSizeF&)) );
-
+    connect( m_parent, SIGNAL(documentSizeChanged(const QSizeF&, const qreal)),
+            this, SLOT(documentSizeChanged(const QSizeF&, const qreal)) );
 
     // Handling signals scroll mouse / page down-up / dragging (tracking)
     connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
@@ -69,6 +63,9 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
     m_parent->installEventFilter( &m_pgKeyEater );
     // Move caret at the end of the scroll animation (pageStepEvent property helps not to move it for mouse scroll)
     connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
+
+    // Connect the parent "refresh view" slot with the slider's changes
+    connect( this, SIGNAL(sliderValueChanged(int)), m_parent, SLOT(verticalSliderValueChanged(int)) );
 }
 
 ScrollBar::~ScrollBar() {
@@ -140,38 +137,39 @@ void ScrollBar::sliderChange ( SliderChange change ) {
     // adding/removing lines, or perhaps I'm wrapping) and increase the maximum the control can be scrolled to.
     // This can't be as simple as doing m_internalLineCount = (m_parent->document()->lineCount() - 1);
     // because in wrap mode this isn't always valid and might create problems. A full 'recalculate' has to be triggered.
-    setMaximum( (m_internalLineCount - 1) * m_textLineHeight );
+    setMaximum( m_internalLineCount - 1 );
     // qDebug() << "sliderValueChange after setMaximum received and set to == " << value();
+
+    emit sliderValueChanged(value()); // Signal our parents that it's time to redraw the scene
     QAbstractSlider::sliderChange(change);
 }
 
 // Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
-void ScrollBar::documentSizeChanged(const QSizeF & newSize) {
-
-    /* TODO: fix this when we have a working documentSizeChanged
+void ScrollBar::documentSizeChanged(const QSizeF & newSize, const qreal lineHeight) {
 
     // Useful information:
     // - The hierarchy used to find the parent QPlainTextEdit widget is:
     //   QScrollBar >parent> qt_scrollarea_vcontainer >parent> QPlainTextEdit
     // - If we don't insert frames or tables, blocks == lines
-    
+
+    // In case of a custom control, the lineHeight has to be manually provided. The code to relink a QPlainTextEdit is left
+    // here for compatibility reasons
+
     // Calculate the height of a whatsoever line (the first is chosen since it is always present)
-    QTextBlock block = m_parent->document()->findBlockByNumber( 0 );
-    QTextLayout *layout = block.layout(); // Layout of a line
-    QTextLine textLine = layout->lineAt( 0 );
-    m_textLineHeight = textLine.height();
+    // QTextBlock block = m_parent->document()->findBlockByNumber( 0 );
+    // QTextLayout *layout = block.layout(); // Layout of a line
+    // QTextLine textLine = layout->lineAt( 0 );
+
+    m_textLineHeight = lineHeight; // textLine.height();
     // Update the maximum number of visible lines in the text control, this might have changed
-    m_maxViewVisibleLines = qFloor( qreal( m_parent->height() ) / m_textLineHeight );
+    m_maxViewVisibleLines = qFloor( qreal( m_parent->viewport()->height() ) / m_textLineHeight );
 
     // Calculate the real number of lines in the document
-    m_internalLineCount = int( newSize.height() / m_textLineHeight );
+    m_internalLineCount = int( newSize.height() );
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
-    setMaximum( (m_internalLineCount - 1)* m_textLineHeight );
+    setMaximum( m_internalLineCount - 1 );
     // qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxViewVisibleLines << " m_internalLineCount "
-    //   << m_internalLineCount;
-
-
-    */
+    //  << m_internalLineCount;
 }
 
 // The most important event in the control: repaint.
@@ -193,7 +191,7 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
     // or equal to the line we're scrolled at), the position of the slider is:
     //   slider_position = view_height * (line_where_the_view_is_scrolled / total_number_of_lines_in_the_document)
     // in this case we calculate a "relative" position by using value() and maximum() which are relative to the control (not to the document)
-    float viewRelativePos = float(m_maxViewVisibleLines) * (float(value()) / float(maximum() + (extraBottomLines*m_textLineHeight)));
+    float viewRelativePos = float(m_maxViewVisibleLines) * (float(value()) / float(maximum() + (extraBottomLines)));
 
     // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos

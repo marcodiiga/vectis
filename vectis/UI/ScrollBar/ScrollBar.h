@@ -43,11 +43,14 @@ private:
 
 private slots: // Consult the respective definitions for a thoroughly documentation of these methods,
                // they're not part of an external interface
-    void documentSizeChanged ( const QSizeF & newSize );
+    void documentSizeChanged ( const QSizeF & newSize, const qreal lineHeight );
     void sliderPressed ();
     void sliderReleased ();
     void actionTriggered ( int action );
     void moveParentCaret ();
+
+signals:
+    void sliderValueChanged( int value );
 };
 
 #endif // CUSTOMSCROLLBAR_H

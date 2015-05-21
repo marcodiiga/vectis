@@ -57,7 +57,7 @@ private:
     // Qt hasn't a reliable way to detect whether all widgets have reached their stable
     // dimension (i.e. all resize() have been triggered), thus we delay syntax highlighting
     // and other expensive operations until the last resize() has been triggered
-    bool m_firstDocumentRecalculate;
+    bool m_firstDocumentRecalculate;    
 
     QString m_plainText;
     const CodeTextEdit& m_codeTextEdit;
@@ -65,6 +65,8 @@ private:
     // Variables related to how the control renders lines
     int m_characterWidthPixels;
     int m_wrapWidth;
+    int m_numberOfEditorLines;
+    int m_maximumCharactersLine; // According to wrapWidth
 
     std::unique_ptr<LexerBase> m_lexer;
     bool m_needReLexing; // Whether the document needs re-lexing

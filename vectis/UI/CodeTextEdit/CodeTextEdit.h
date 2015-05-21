@@ -22,10 +22,18 @@ private:
     // document
     void resizeEvent(QResizeEvent *evt);
 
+    int m_sliderValue;
+
     QFont m_monospaceFont;
     int m_characterWidthPixels;
     Document *m_document;
     std::unique_ptr<ScrollBar>    m_verticalScrollBar;
+
+private slots:
+    void verticalSliderValueChanged( int value );
+
+signals:
+    void documentSizeChanged( const QSizeF& newSize, const qreal lineHeight );
 };
 
 #endif // CUSTOMCODEEDIT_H
