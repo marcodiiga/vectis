@@ -143,9 +143,11 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   // First time we don't have a destination set, just find one (if there's any)
   calculateNextDestination();
 
+  // Implement the main rendering loop algorithm which renders characters segment by segment
+  // on the viewport area
   for(auto& pl : m_document->m_physicalLines) {
 
-    size_t editorLineIndex = -1; // This helps tracking the last EditorLine
+    size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
     for(auto& el : pl.m_editorLines) {
       ++editorLineIndex;
 
@@ -167,7 +169,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
 
           lineRelativePos = 0; // Next editor line will just start from the beginning
           documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
-              (editorLineIndex == pl.m_editorLines.size()-1 ? 1 : 0);
+              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
 
           break; // Go and fetch a new line for the next cycle
         } else {
@@ -181,23 +183,29 @@ void CodeTextEdit::renderDocumentOnPixmap() {
             charsRendered = ts.size();
           }
 
-          bool addNewLine = false; // Check if this goal also exhausted the current line entirely
+          bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
+                                       // another one
+          bool addNewLine = false; // If this was the last editor line, also add a newline because it
+                                   // corresponds to a new physical line starting
           if(nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
+            goFetchNewLine = true;
+
             // Do not allow EditorLine to insert a '\n'. They're virtual lines
-            if (editorLineIndex == pl.m_editorLines.size()-1)
+            if (editorLineIndex == pl.m_editorLines.size())
               addNewLine = true;
 
             lineRelativePos = 0; // Next editor line will just start from the beginning
           } else
             lineRelativePos += charsRendered;
 
-          documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's end
-                                                                       // AND a physical line ended, not an EditorLine
+          documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's
+                                                                       // end AND a physical line ended, not an EditorLine
 
           calculateNextDestination(); // Need a new goal
 
-          if (addNewLine)
-            break; // Go fetch a new line
+          if( goFetchNewLine )
+            break; // Go fetch a new editor line (possibly on another physical line),
+                   // we exhausted this editor line
         }
 
       } while(true);
@@ -353,6 +361,7 @@ void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
 
   // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
   emit documentSizeChanged( newSize, lineHeight );
+  repaint();
 }
 
 void CodeTextEdit::verticalSliderValueChanged (int value) {

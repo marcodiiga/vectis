@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QRegExp>
+#include <deque>
 
 #include <QDebug>
 
@@ -73,7 +74,7 @@ void Document::setWrapWidth(int width) {
 
 
 void Document::recalculateDocumentLines () {
-  qDebug() << "Recalculating document lines..";
+  //qDebug() << "Recalculating document lines..";
   m_firstDocumentRecalculate = false;
 
   if (m_needReLexing) {
@@ -100,40 +101,47 @@ void Document::recalculateDocumentLines () {
 
       std::vector<EditorLine> edLines;
       QString restOfLine = line;
-      bool splitPointFound = false;
 
       // Calculate the allowed number of characters per editor line
       int maxChars = static_cast<int>( m_wrapWidth / m_codeTextEdit.getCharacterWidthPixels() );
+      if (maxChars < 5)
+        maxChars = 5; // Keep it to a minimum
 
+      // Start the wrap-splitting algorithm or resort to a brute-force character splitting one if
+      // no suitable spaces could be found to split the line
+      while(restOfLine.size() > maxChars) {
 
-      // Try to find a space from the right to the left WITHIN the limit. If found - split the line there
-      for(int i = line.count()-1; i >= 0; --i) {
-        if ( line[i] == ' ' && line.count() - i <=  maxChars ) {
-          splitPointFound = true;
-          edLines.emplace( edLines.begin(), restOfLine.right(line.count() - i) ); // Insert at the front (stack-wise)
-          qDebug() << restOfLine << ";" << restOfLine.right(line.count() - i);
-          restOfLine = restOfLine.left(i);
-          break;
+        int bestSplittingPointFound = -1;
+        for(int i = 0; i < restOfLine.count(); ++i) {
+          if (i > maxChars)
+            break; // We couldn't find a suitable space split point for restOfLine
+          if ( restOfLine[i] == ' ' )
+            bestSplittingPointFound = i;
+        }
+
+        if (bestSplittingPointFound != -1) { // We found a suitable space point to split this line
+          edLines.push_back( restOfLine.left( bestSplittingPointFound ));
+          restOfLine = restOfLine.right( restOfLine.size() - bestSplittingPointFound );
+        } else {
+          // No space found, brutally split characters
+          edLines.push_back( restOfLine.left( maxChars ));
+          restOfLine = restOfLine.right( restOfLine.size() - maxChars );
         }
       }
-      if (splitPointFound == false) {
-        // No space found, brutally split characters
-        edLines.emplace( edLines.begin(), restOfLine.right( maxChars ) );
-        qDebug() << restOfLine << ";" << restOfLine.right( maxChars );
-        restOfLine = restOfLine.left( restOfLine.count() - maxChars );
-      }
-
+      edLines.push_back( restOfLine ); // Insert the last part and proceed
 
       for(auto& ll : edLines)
-        if (ll.m_characters.size() > m_maximumCharactersLine)
-          m_maximumCharactersLine = line.size(); // Check if this is the longest line found ever
+        if (ll.m_characters.size() > m_maximumCharactersLine) // Update if this is the longest line ever found
+          m_maximumCharactersLine = static_cast<int>(ll.m_characters.size());
 
       // No need to do anything special for tabs - they're automatically converted into spaces
       PhysicalLine phLine;
-      phLine.m_editorLines = std::move(edLines);
+      std::vector<EditorLine> edVector;
+      std::copy( edLines.begin(), edLines.end(), std::back_inserter(edVector) );
+      phLine.m_editorLines = std::move(edVector);
       m_physicalLines.emplace_back( std::move(phLine) );
 
-      m_numberOfEditorLines += 2; // Some more EditorLine
+      m_numberOfEditorLines += static_cast<int>(edLines.size()); // Some more EditorLine
 
 //      // Try to find a space from the right to the left WITHIN the limit. If found - split the line there
 //      for(int i = line.count()-1; i >= 0; --i) {
