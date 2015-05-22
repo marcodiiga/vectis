@@ -39,8 +39,9 @@ private slots:
     void tabWasRequestedToCloseSlot(int tabId);
 
 private:
+
     Ui::VMainWindow *ui;
-    std::vector<std::unique_ptr<Document>> m_documents;
+    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
     std::unique_ptr<CodeTextEdit> m_customCodeEdit;    
     std::unique_ptr<TabsBar>      m_tabsBar;
 };

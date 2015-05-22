@@ -159,8 +159,6 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
     pos++;
   }
 
- const char *ptr = str->c_str() + pos; // debug
-
   // Handle any keyword or identifier until a terminator character
   bool foundSegment = false;
   size_t startSegment = pos;
@@ -241,8 +239,6 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
     if (styleDb->styleSegment.size() > 0)
       m_adaptPreviousSegments.push_back(styleDb->styleSegment.size()-1);
   }
-
-  const char *ptr2 = str->c_str() + pos; // debug
 
   if (foundSegment == false) { // We couldn't find a normal identifier
     if (str->at(pos) == '{') { // Handle entering/exiting scopes
@@ -538,8 +534,6 @@ void CPPLexer::globalScope() {
 
   // We're at global scope, this will end with EOF
   while (true) {
-
-     const char *ptr = str->c_str() + pos; // debug
 
     // Skip newlines and whitespaces
     while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {

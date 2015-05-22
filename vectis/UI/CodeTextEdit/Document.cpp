@@ -72,9 +72,8 @@ void Document::setWrapWidth(int width) {
   recalculateDocumentLines (); // Recalculate the editor lines with this wrap value
 }
 
-
 void Document::recalculateDocumentLines () {
-  qDebug() << "Recalculating document lines..";
+  // qDebug() << "Recalculating document lines..";
 
   m_firstDocumentRecalculate = false;
 
@@ -149,33 +148,6 @@ void Document::recalculateDocumentLines () {
 
       m_numberOfEditorLines += static_cast<int>(edLines.size()); // Some more EditorLine
 
-//      // Try to find a space from the right to the left WITHIN the limit. If found - split the line there
-//      for(int i = line.count()-1; i >= 0; --i) {
-//        if ( line[i] == ' ' && i <= splitPos) {
-//          splitPointFound = true;
-//          edLines.emplace_back(line.left(i));
-//          edLines.emplace_back(line.right(line.count() - i));
-//          break;
-//        }
-//      }
-//      if (splitPointFound == false) {
-//        // No space found, brutally split characters
-//        edLines.emplace_back( line.left( splitPos) );
-//        edLines.emplace_back( line.right( line.count() - splitPos) );
-//      }
-
-//      if (edLines[0].m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
-//        m_maximumCharactersLine = line.size();
-//      if (edLines[1].m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
-//        m_maximumCharactersLine = line.size();
-
-//      // No need to do anything special for tabs - they're automatically converted into spaces
-//      PhysicalLine phLine;
-//      phLine.m_editorLines = std::move(edLines);
-//      m_physicalLines.emplace_back( std::move(phLine) );
-
-//      m_numberOfEditorLines += 2; // Some more EditorLine
-
     } else { // No wrap or the line fits perfectly within the wrap limits
 
       EditorLine el(line);
@@ -192,7 +164,7 @@ void Document::recalculateDocumentLines () {
   // At this point the PhysicalLines vector has been populated (or is still empty)
   // and the document structure is stored in memory
 
-  qDebug() << "Done recalculating document lines";
+  // qDebug() << "Done recalculating document lines";
 }
 
 

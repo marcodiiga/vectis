@@ -33,9 +33,31 @@ VMainWindow::VMainWindow(QWidget *parent) :
   m_tabsBar = std::make_unique<TabsBar>(this);
   //TabsBar ea;
   m_tabsBar->setFixedHeight(35);
-  m_tabsBar->insertTab("test tab", false);
-  m_tabsBar->insertTab("another tab", false);
+  //m_tabsBar->insertTab("test tab", false);
+  //m_tabsBar->insertTab("another tab", false);
   ui->codeTextEditArea->addWidget(m_tabsBar.get());
+
+  // Create the code editor control
+  m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
+  ui->codeTextEditArea->addWidget( m_customCodeEdit.get() );
+
+
+  // Load the sample data
+  int id = m_tabsBar->insertTab("SimpleFile.cpp", false);
+  auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(*m_customCodeEdit)));
+  it.first->second->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
+  it.first->second->applySyntaxHighlight( CPP );
+  m_customCodeEdit->loadDocument( it.first->second.get() );
+
+  // Load some other sample data
+  int id2 = m_tabsBar->insertTab("BasicBlock.cpp", false);
+  auto it2 = m_tabDocumentMap.insert(std::make_pair(id2, std::make_unique<Document>(*m_customCodeEdit)));
+  it2.first->second->loadFromFile( "../vectis/TestData/BasicBlock.cpp" );
+  it2.first->second->applySyntaxHighlight( CPP );
+  m_customCodeEdit->loadDocument( it2.first->second.get() );
+
+
+  // NOTICE: link connections AFTER all initial documents have been created
   // Link the "changed selected tab" and "tab was requested to close" signals to slots
   connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int)),
           this, SLOT(selectedTabChangedSlot(int)));
@@ -43,16 +65,14 @@ VMainWindow::VMainWindow(QWidget *parent) :
           this, SLOT(tabWasRequestedToCloseSlot(int)));
 
 
-
-
-  // Create the code editor control
-  m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
-  ui->codeTextEditArea->addWidget( m_customCodeEdit.get() );
-  // Create a document, load a file and assign it to the code edit control (i.e. DEBUG - try to render it)
-  m_documents.emplace_back (std::make_unique<Document>(*m_customCodeEdit));
-  m_documents[0]->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
-  m_documents[0]->applySyntaxHighlight( CPP );
-  m_customCodeEdit->loadDocument( m_documents[0].get() );
+//  // Create the code editor control
+//  m_customCodeEdit = std::make_unique<CodeTextEdit>(this);
+//  ui->codeTextEditArea->addWidget( m_customCodeEdit.get() );
+//  // Create a document, load a file and assign it to the code edit control (i.e. DEBUG - try to render it)
+//  m_documents.emplace_back (std::make_unique<Document>(*m_customCodeEdit));
+//  m_documents[0]->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
+//  m_documents[0]->applySyntaxHighlight( CPP );
+//  m_customCodeEdit->loadDocument( m_documents[0].get() );
 
 
 
@@ -136,6 +156,11 @@ void VMainWindow::paintEvent(QPaintEvent *)
 
 void VMainWindow::selectedTabChangedSlot(int newId) {
   qDebug() << "Selected tab has changed to " << newId;
+
+  m_customCodeEdit->loadDocument( m_tabDocumentMap[newId].get() );
+
+
+
   // Save everything to buffer
   //    contents[currentlySelected] = m_customCodeEdit->toPlainText();
   //    currentlySelected = newId;

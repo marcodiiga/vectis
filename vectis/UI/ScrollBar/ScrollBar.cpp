@@ -44,7 +44,7 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
 
     // WA_OpaquePaintEvent specifies that we'll redraw the control every time it is needed without any system intervention.
     // WA_NoSystemBackground avoids the system to draw the background (we'll handle it as well)
-    setAttribute( Qt::WA_OpaquePaintEvent, false );
+    setAttribute( Qt::WA_OpaquePaintEvent, true );
     setAttribute( Qt::WA_NoSystemBackground, true );
     setStyleSheet(QString("QScrollBar:vertical { \
                               width:15px;        \
@@ -228,7 +228,7 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
 
     // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
-    float rectAbsPos = (float(rect().height()) * viewRelativePos) / float(m_maxViewVisibleLines);
+    float rectAbsPos = (float(rect().height()) * viewRelativePos) / float(m_maxViewVisibleLines);    
 
     // qDebug() << "maxNumLines is " << maxNumLines << " and viewRelativePos is = " << viewRelativePos <<
     //            " rectAbsPos = " << rectAbsPos;
@@ -247,7 +247,6 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
     // This is finally the drawing area for the slider
     QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
     // p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
-
 
     // >> ------------------------
     //       Slider drawing

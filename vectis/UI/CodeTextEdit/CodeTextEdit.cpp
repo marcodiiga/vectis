@@ -56,10 +56,13 @@ void CodeTextEdit::loadDocument(Document *doc) {
 
   QSizeF newSize;
   newSize.setHeight( m_document->m_numberOfEditorLines );
-  newSize.setWidth ( m_document->m_maximumCharactersLine );
+  newSize.setWidth ( m_document->m_maximumCharactersLine );  
 
   // Emit a documentSizeChanged signal. This will trigger scrollbars resizing
   emit documentSizeChanged( newSize, fontMetrics().height() );
+
+  m_verticalScrollBar->setSliderPosition(0);
+  this->viewport()->repaint(); // Trigger a cache invalidation for the viewport (necessary)
 }
 
 int CodeTextEdit::getViewportWidth() const {
@@ -73,17 +76,20 @@ int CodeTextEdit::getCharacterWidthPixels() const {
 // As the name suggests: render the entire document on the internal stored pixmap
 void CodeTextEdit::renderDocumentOnPixmap() {
 
+  QPixmap empty(m_documentPixmap->size()); // Empty the pixmap
+  m_documentPixmap->swap(empty);
+  m_documentPixmap->fill(Qt::transparent); // Set the pixmap transparent
+
   QPainter painter(m_documentPixmap.get()); // Draw into the pixmap
   painter.setFont(this->font()); // And grab the widget's monospace font
 
-  // Draw control background (this blends with the TabsBar selected tab's bottom color)
-  const QBrush backgroundBrush(QColor(39, 40, 34));
-  painter.setBrush(backgroundBrush);
-  painter.fillRect(m_documentPixmap->rect(), backgroundBrush);
+  // Drawing the background is not needed since it is already transparent (the background only
+  // needs to be set on the viewport)
+  // const QBrush backgroundBrush(QColor(39, 40, 34));
+  // painter.setBrush(backgroundBrush);
+  // painter.fillRect(m_documentPixmap->rect(), backgroundBrush);
 
-  // DEBUG drawing code
-
-  painter.setPen(QPen(Qt::white)); // TODO These colors suck. Find something better.
+  painter.setPen(QPen(Qt::white)); // A classic Monokai style
   auto setColor = [&painter](Style s) {
     switch(s) {
     case Comment: {
@@ -117,7 +123,6 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   auto& styleIt = m_document->m_styleDb.styleSegment.begin();
   auto& styleEnd = m_document->m_styleDb.styleSegment.end();
   size_t nextDestination = -1;
-
 
   auto calculateNextDestination = [&]() {
     // We can have 2 cases here:
@@ -243,8 +248,6 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 
 
 
-
-
 //  // ps. to relink the scrollbar:
 //  // 1) documentSizeChanged should be emitted every time the document has a different number of editor lines -> DONE
 //  // 2) scrolling is just about drawing offsets, have the offsets set by the scrollbar be reflected here
@@ -343,7 +346,7 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
 //    startpoint.setY(startpoint.y() + fontMetrics().height());
 //  }
 
-  QAbstractScrollArea::paintEvent(event);
+  //QAbstractScrollArea::paintEvent(event);
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
   if (m_document != nullptr)
