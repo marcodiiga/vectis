@@ -98,9 +98,69 @@ void Document::recalculateDocumentLines () {
         line.count() * m_codeTextEdit.getCharacterWidthPixels() > m_wrapWidth) {
       // We have a wrap and the line is too big - WRAP IT
 
-      // TODO - beware tabs (they count more than 1)
+      std::vector<EditorLine> edLines;
+      QString restOfLine = line;
+      bool splitPointFound = false;
 
-      qDebug() << "NEED TO WRAP!";
+      // Calculate the allowed number of characters per editor line
+      int maxChars = static_cast<int>( m_wrapWidth / m_codeTextEdit.getCharacterWidthPixels() );
+
+
+      // Try to find a space from the right to the left WITHIN the limit. If found - split the line there
+      for(int i = line.count()-1; i >= 0; --i) {
+        if ( line[i] == ' ' && line.count() - i <=  maxChars ) {
+          splitPointFound = true;
+          edLines.emplace( edLines.begin(), restOfLine.right(line.count() - i) ); // Insert at the front (stack-wise)
+          qDebug() << restOfLine << ";" << restOfLine.right(line.count() - i);
+          restOfLine = restOfLine.left(i);
+          break;
+        }
+      }
+      if (splitPointFound == false) {
+        // No space found, brutally split characters
+        edLines.emplace( edLines.begin(), restOfLine.right( maxChars ) );
+        qDebug() << restOfLine << ";" << restOfLine.right( maxChars );
+        restOfLine = restOfLine.left( restOfLine.count() - maxChars );
+      }
+
+
+      for(auto& ll : edLines)
+        if (ll.m_characters.size() > m_maximumCharactersLine)
+          m_maximumCharactersLine = line.size(); // Check if this is the longest line found ever
+
+      // No need to do anything special for tabs - they're automatically converted into spaces
+      PhysicalLine phLine;
+      phLine.m_editorLines = std::move(edLines);
+      m_physicalLines.emplace_back( std::move(phLine) );
+
+      m_numberOfEditorLines += 2; // Some more EditorLine
+
+//      // Try to find a space from the right to the left WITHIN the limit. If found - split the line there
+//      for(int i = line.count()-1; i >= 0; --i) {
+//        if ( line[i] == ' ' && i <= splitPos) {
+//          splitPointFound = true;
+//          edLines.emplace_back(line.left(i));
+//          edLines.emplace_back(line.right(line.count() - i));
+//          break;
+//        }
+//      }
+//      if (splitPointFound == false) {
+//        // No space found, brutally split characters
+//        edLines.emplace_back( line.left( splitPos) );
+//        edLines.emplace_back( line.right( line.count() - splitPos) );
+//      }
+
+//      if (edLines[0].m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
+//        m_maximumCharactersLine = line.size();
+//      if (edLines[1].m_characters.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
+//        m_maximumCharactersLine = line.size();
+
+//      // No need to do anything special for tabs - they're automatically converted into spaces
+//      PhysicalLine phLine;
+//      phLine.m_editorLines = std::move(edLines);
+//      m_physicalLines.emplace_back( std::move(phLine) );
+
+//      m_numberOfEditorLines += 2; // Some more EditorLine
 
     } else { // No wrap or the line fits perfectly within the wrap limits
 
@@ -109,7 +169,7 @@ void Document::recalculateDocumentLines () {
       m_physicalLines.emplace_back( std::move(phLine) );
 
       ++m_numberOfEditorLines; // One more EditorLine
-      if (line.size() > m_maximumCharactersLine)
+      if (line.size() > m_maximumCharactersLine) // Check if this is the longest line found ever
         m_maximumCharactersLine = line.size();
     }
 

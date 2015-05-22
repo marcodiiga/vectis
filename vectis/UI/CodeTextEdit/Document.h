@@ -32,6 +32,7 @@ struct PhysicalLine {
   PhysicalLine (EditorLine&& editorLine) {
     m_editorLines.emplace_back(std::forward<EditorLine>(editorLine));
   }
+  PhysicalLine () = default;
 
   std::vector<EditorLine> m_editorLines;
 };

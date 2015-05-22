@@ -143,60 +143,68 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   // First time we don't have a destination set, just find one (if there's any)
   calculateNextDestination();
 
-  for(auto pl : m_document->m_physicalLines) {
+  for(auto& pl : m_document->m_physicalLines) {
 
-    auto el = pl.m_editorLines[0]; // DEBUG - assume only one editorLine
+    size_t editorLineIndex = -1; // This helps tracking the last EditorLine
+    for(auto& el : pl.m_editorLines) {
+      ++editorLineIndex;
 
-    do {
-      startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
+      do {
+        startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
 
-      // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
-      if (nextDestination == -1 ||
-          nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
+        // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
+        if (nextDestination == -1 ||
+            nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
 
-        // Multiple lines will have to be rendered, just render this till the end and continue
+          // Multiple lines will have to be rendered, just render this till the end and continue
 
-        int charsRendered = 0;
-        if (el.m_characters.size() > 0) { // Empty lines must be skipped
-          QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
-          painter.drawText(startpoint, ts);
-          charsRendered = ts.size();
-        }
+          int charsRendered = 0;
+          if (el.m_characters.size() > 0) { // Empty lines must be skipped
+            QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
+            painter.drawText(startpoint, ts);
+            charsRendered = ts.size();
+          }
 
-        lineRelativePos = 0; // Next editor line will just start from the beginning
-        documentRelativePos += charsRendered + 1 /* Plus a newline */;
-
-        break; // Go and fetch a new line for the next cycle
-      } else {
-
-        // We can reach the goal within this line
-
-        int charsRendered = 0;
-        if (el.m_characters.size() > 0) { // Empty lines must be skipped
-          QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
-          painter.drawText(startpoint, ts);
-          charsRendered = ts.size();
-        }
-
-        bool addNewLine = false; // Check if this goal also exhausted the current line entirely
-        if(nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
-          addNewLine = true;
           lineRelativePos = 0; // Next editor line will just start from the beginning
-        } else
-          lineRelativePos += charsRendered;
+          documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
+              (editorLineIndex == pl.m_editorLines.size()-1 ? 1 : 0);
 
-        documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's end
+          break; // Go and fetch a new line for the next cycle
+        } else {
 
-        calculateNextDestination(); // Need a new goal
+          // We can reach the goal within this line
 
-        if (addNewLine)
-          break; // Go fetch a new line
-      }
+          int charsRendered = 0;
+          if (el.m_characters.size() > 0) { // Empty lines must be skipped
+            QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
+            painter.drawText(startpoint, ts);
+            charsRendered = ts.size();
+          }
 
-    } while(true);
+          bool addNewLine = false; // Check if this goal also exhausted the current line entirely
+          if(nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
+            // Do not allow EditorLine to insert a '\n'. They're virtual lines
+            if (editorLineIndex == pl.m_editorLines.size()-1)
+              addNewLine = true;
 
-    // Move the rendering cursor (carriage-return)
-    startpoint.setY(startpoint.y() + fontMetrics().height());
+            lineRelativePos = 0; // Next editor line will just start from the beginning
+          } else
+            lineRelativePos += charsRendered;
+
+          documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's end
+                                                                       // AND a physical line ended, not an EditorLine
+
+          calculateNextDestination(); // Need a new goal
+
+          if (addNewLine)
+            break; // Go fetch a new line
+        }
+
+      } while(true);
+
+      // Move the rendering cursor (carriage-return)
+      startpoint.setY(startpoint.y() + fontMetrics().height());
+    }
   }
 
   m_invalidatedPixmap = false; // QPixmap has been redrawn
