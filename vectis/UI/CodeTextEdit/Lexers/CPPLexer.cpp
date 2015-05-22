@@ -176,7 +176,13 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
     // It might be a reserved keyword
     std::string segment = str->substr(startSegment, pos - startSegment);
     if (m_reservedKeywords.find(segment) != m_reservedKeywords.end()) {
-      s = Keyword;
+      // For purely aesthetic reasons, style the keywords which aren't private/protected/public
+      // in an inner scope with a different style
+      if (m_scopesStack.size() > 0 && segment.compare("protected") != 0
+          && segment.compare("private") != 0 && segment.compare("public") != 0)
+        s = KeywordInnerScope;
+      else
+        s = Keyword;
       if ( (segment.compare("class") == 0 || segment.compare("struct") == 0) &&
            m_classKeywordActiveOnScope == -2 /* No inner class support for now */)
         m_classKeywordActiveOnScope = -1; // We keep track of this since a class scope is *not* a local

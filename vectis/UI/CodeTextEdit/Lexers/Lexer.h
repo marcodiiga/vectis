@@ -15,6 +15,7 @@ enum Style {
   //==-- Generic styles --==//
   Normal,
   Keyword,
+  KeywordInnerScope,
   Comment,
   QuotedString,
   Identifier, // E.g. a function name (fully qualified or unqualified) or a macro

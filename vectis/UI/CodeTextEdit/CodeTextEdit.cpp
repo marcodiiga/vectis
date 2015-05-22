@@ -30,7 +30,7 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   // replacement monospace font
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
-  m_monospaceFont.setPixelSize(12);
+  m_monospaceFont.setPixelSize(14);
 #else
   m_monospaceFont.setFamily( "Monospace" );
 #endif
@@ -87,22 +87,23 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   auto setColor = [&painter](Style s) {
     switch(s) {
     case Comment: {
-      painter.setPen(QPen(Qt::gray));
+      painter.setPen(QPen(QColor(117,113,94))); // Gray-ish
     } break;
     case Keyword: {
-      painter.setPen(QPen(Qt::blue));
+      painter.setPen(QPen(QColor(249,38,114))); // Pink-ish
     } break;
     case QuotedString: {
-      painter.setPen(QPen(Qt::red));
+      painter.setPen(QPen(QColor(230,219,88))); // Yellow-ish
     } break;
     case Identifier: {
-      painter.setPen(QPen(Qt::green));
+      painter.setPen(QPen(QColor(166,226,46))); // Green-ish
     } break;
+    case KeywordInnerScope:
     case FunctionCall: {
-      painter.setPen(QPen(Qt::cyan));
+      painter.setPen(QPen(QColor(102,217,239))); // Light blue
     } break;
     case Literal: {
-      painter.setPen(QPen(Qt::darkRed));
+      painter.setPen(QPen(QColor(174,129,255))); // Purple-ish
     } break;
     default: {
       painter.setPen(QPen(Qt::white));
