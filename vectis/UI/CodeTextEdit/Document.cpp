@@ -74,7 +74,8 @@ void Document::setWrapWidth(int width) {
 
 
 void Document::recalculateDocumentLines () {
-  //qDebug() << "Recalculating document lines..";
+  qDebug() << "Recalculating document lines..";
+
   m_firstDocumentRecalculate = false;
 
   if (m_needReLexing) {
@@ -86,6 +87,10 @@ void Document::recalculateDocumentLines () {
   m_physicalLines.clear();
   m_numberOfEditorLines = 0;
   m_maximumCharactersLine = 0;
+  // Reset temporary buffers
+  std::vector<EditorLine> edLines;
+  QString restOfLine;
+  edLines.reserve(10); // Should be enough for every splitting
 
   // Scan each line (until a newline is found)
   QTextStream ss(&m_plainText);
@@ -99,13 +104,13 @@ void Document::recalculateDocumentLines () {
         line.count() * m_codeTextEdit.getCharacterWidthPixels() > m_wrapWidth) {
       // We have a wrap and the line is too big - WRAP IT
 
-      std::vector<EditorLine> edLines;
-      QString restOfLine = line;
+      edLines.clear();
+      restOfLine = line;
 
       // Calculate the allowed number of characters per editor line
       int maxChars = static_cast<int>( m_wrapWidth / m_codeTextEdit.getCharacterWidthPixels() );
-      if (maxChars < 5)
-        maxChars = 5; // Keep it to a minimum
+      if (maxChars < 10)
+        maxChars = 10; // Keep it to a minimum
 
       // Start the wrap-splitting algorithm or resort to a brute-force character splitting one if
       // no suitable spaces could be found to split the line
@@ -115,7 +120,7 @@ void Document::recalculateDocumentLines () {
         for(int i = 0; i < restOfLine.count(); ++i) {
           if (i > maxChars)
             break; // We couldn't find a suitable space split point for restOfLine
-          if ( restOfLine[i] == ' ' )
+          if ( restOfLine[i] == ' ' && i != 0 /* Doesn't make sense to split at 0 pos */)
             bestSplittingPointFound = i;
         }
 
@@ -126,6 +131,7 @@ void Document::recalculateDocumentLines () {
           // No space found, brutally split characters
           edLines.push_back( restOfLine.left( maxChars ));
           restOfLine = restOfLine.right( restOfLine.size() - maxChars );
+          qDebug() << "BRUTAL SPLIT" << bestSplittingPointFound;
         }
       }
       edLines.push_back( restOfLine ); // Insert the last part and proceed
@@ -185,6 +191,8 @@ void Document::recalculateDocumentLines () {
 
   // At this point the PhysicalLines vector has been populated (or is still empty)
   // and the document structure is stored in memory
+
+  qDebug() << "Done recalculating document lines";
 }
 
 
@@ -219,6 +227,8 @@ void Document::recalculateDocumentLines () {
 
 // Copy the characters for this editor line into our characters vector
 EditorLine::EditorLine(QString str) {
+  if (str.isEmpty())
+    return;
   m_characters.resize(str.length());
   std::copy(str.begin(), str.end(), m_characters.begin());
 }
