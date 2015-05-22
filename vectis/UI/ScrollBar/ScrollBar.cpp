@@ -62,7 +62,7 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
     // Install PageDown/PageUp key eater for the parent control
     m_parent->installEventFilter( &m_pgKeyEater );
     // Move caret at the end of the scroll animation (pageStepEvent property helps not to move it for mouse scroll)
-    connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
+    // connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
 
     // Connect the parent "refresh view" slot with the slider's changes
     connect( this, SIGNAL(sliderValueChanged(int)), m_parent, SLOT(verticalSliderValueChanged(int)) );
@@ -111,12 +111,14 @@ void ScrollBar::actionTriggered ( int action ) {
 
     // If an animation is already in progress - interrupt it. Values will be updated and a new animation will start
     if(m_scrollAnim.state() == QAbstractAnimation::State::Running)
-        m_scrollAnim.stop();
+        m_scrollAnim.setEndValue(sliderPosition());
+    else {
+      m_scrollAnim.setStartValue(value());
+      m_scrollAnim.setDuration(100);
+      m_scrollAnim.setEndValue(sliderPosition());
+      m_scrollAnim.start();
+    }
 
-    m_scrollAnim.setDuration(120);
-    m_scrollAnim.setStartValue(value());
-    m_scrollAnim.setEndValue(sliderPosition());
-    m_scrollAnim.start();
 }
 
 // When the control is resized, the maximum number of lines we can display into the view is updated as well

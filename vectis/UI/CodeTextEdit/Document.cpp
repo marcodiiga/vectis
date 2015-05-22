@@ -73,6 +73,7 @@ void Document::setWrapWidth(int width) {
 
 
 void Document::recalculateDocumentLines () {
+  qDebug() << "Recalculating document lines..";
   m_firstDocumentRecalculate = false;
 
   if (m_needReLexing) {
@@ -98,6 +99,8 @@ void Document::recalculateDocumentLines () {
       // We have a wrap and the line is too big - WRAP IT
 
       // TODO - beware tabs (they count more than 1)
+
+      qDebug() << "NEED TO WRAP!";
 
     } else { // No wrap or the line fits perfectly within the wrap limits
 

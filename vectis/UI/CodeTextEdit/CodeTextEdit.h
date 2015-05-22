@@ -17,12 +17,15 @@ public:
 
 private:
     void paintEvent(QPaintEvent *event);
+    void renderDocumentOnPixmap();
+    std::unique_ptr<QPixmap> m_documentPixmap; // The rendered document
+    bool m_invalidatedPixmap; // Whether the pixmap needs to be re-rendered
 
     // To have wrapping work, the resize event will be forwarded to the loaded
     // document
     void resizeEvent(QResizeEvent *evt);
 
-    int m_sliderValue;
+    int m_sliderValue; // The slider value - gets updated by verticalSliderValueChanged
 
     QFont m_monospaceFont;
     int m_characterWidthPixels;
