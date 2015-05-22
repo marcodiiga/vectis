@@ -68,7 +68,7 @@ void Document::applySyntaxHighlight(SyntaxHighlight s) {
 // "no wrap" and it's the default
 void Document::setWrapWidth(int width) {
   m_wrapWidth = width;
-  qDebug() << "setWrapWidth() to " << width;
+  // qDebug() << "setWrapWidth() to " << width;
   recalculateDocumentLines (); // Recalculate the editor lines with this wrap value
 }
 

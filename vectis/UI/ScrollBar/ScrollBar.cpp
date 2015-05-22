@@ -56,8 +56,9 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
 
     // Handling signals scroll mouse / page down-up / dragging (tracking)
     connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
-    connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
-    connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
+    //connect(this, SIGNAL(sliderPressed()), this, SLOT(sliderPressed()));
+    //connect(this, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
+    //connect(this, SIGNAL())
 
     // Install PageDown/PageUp key eater for the parent control
     m_parent->installEventFilter( &m_pgKeyEater );
@@ -73,11 +74,41 @@ ScrollBar::~ScrollBar() {
 }
 
 // Tracking events (user is manually moving the slider)
-void ScrollBar::sliderReleased () {
-    m_sliderIsBeingDragged = false;
-}
-void ScrollBar::sliderPressed () {
+//void ScrollBar::sliderReleased () {
+//    m_sliderIsBeingDragged = false;
+//}
+//void ScrollBar::sliderPressed () {
+//    m_sliderIsBeingDragged = true;
+//}
+
+// Tracking events are imprecise if we manually draw the slider. Tracking the mouse click into the slider's area
+// is way more accurate
+void ScrollBar::mousePressEvent ( QMouseEvent *e ) {
+  if( m_sliderIsBeingDragged == false && m_sliderPath.contains( e->pos() ) == true ) {
     m_sliderIsBeingDragged = true;
+    m_mouseTrackingStartPoint = e->pos().y();
+    m_mouseTrackingStartValue = sliderPosition();
+  }
+}
+
+// The logic here is the following: if we're tracking the slider, calculate the delta from the tracking start
+// point and scale it not according to the scrollbar area rectangle, but to the number of lines of the document
+// (at rect.y == 0 we're at line 0, at rect.y == max we're at line lastLine). Finally add this value to the
+// slider position that was stored before the tracking (so that we're not modifying its position)
+void ScrollBar::mouseMoveEvent ( QMouseEvent *e ) {
+  if ( m_sliderIsBeingDragged == true ) {
+    // x : m_internalLineCount = delta : this->rect().height()
+    int delta = ( e->pos().y() - m_mouseTrackingStartPoint );
+    int x = static_cast<int>( delta * m_internalLineCount / this->rect().height() );
+    setSliderPosition(m_mouseTrackingStartValue + x);
+  }
+}
+
+void ScrollBar::mouseReleaseEvent ( QMouseEvent * ) {
+  if ( m_sliderIsBeingDragged == true ) {
+    emit sliderReleased();
+    m_sliderIsBeingDragged = false;
+  }
 }
 
 // Move the caret (cursor) of the parent to the position reached by the scrollbar. Do this ONLY WHEN animation has
@@ -237,13 +268,14 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
 
     // Draws the slider with a rounded rectangle
     // rcSlider is the hitbox, but to draw it we only take a width subsection
-    QRect rcSliderSubsection( rcSlider);
+    QRect rcSliderSubsection( rcSlider );
     rcSliderSubsection.setX( rcSliderSubsection.x()+3 );
     rcSliderSubsection.setWidth( rcSliderSubsection.width()-2 );
     p.setRenderHint( QPainter::Antialiasing );
-    QPainterPath path;
-    path.setFillRule( Qt::WindingFill ); // Fill for closed-shapes
-    path.addRoundedRect( rcSliderSubsection, 4, 4 );
+    QPainterPath empty;
+    m_sliderPath.swap(empty); // Cleans the current slider path
+    m_sliderPath.setFillRule( Qt::WindingFill ); // Fill for closed-shapes
+    m_sliderPath.addRoundedRect( rcSliderSubsection, 4, 4 );
 
     // Select a gradient brush to fill the slider
     QLinearGradient fillGrad( rect().topLeft(), rect().topRight() );
@@ -253,7 +285,7 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
     p.setBrush( gradFill );
 
     // Finally draw the slider
-    p.drawPath( path.simplified() /* Join any segments and obtain a single path */ );
+    p.drawPath( m_sliderPath.simplified() /* Join any segments and obtain a single path */ );
 
     // QScrollBar::paintEvent(event); // No base class paintEvent - we completely handled redrawing
 }
