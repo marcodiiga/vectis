@@ -88,6 +88,10 @@ void ScrollBar::mousePressEvent ( QMouseEvent *e ) {
     m_sliderIsBeingDragged = true;
     m_mouseTrackingStartPoint = e->pos().y();
     m_mouseTrackingStartValue = sliderPosition();
+  } else {
+    // A click was detected but NOT on the slider. Move the slider at the click position
+    int x = static_cast<int>( e->pos().y() * m_internalLineCount / this->rect().height() );
+    setSliderPosition(x);
   }
 }
 

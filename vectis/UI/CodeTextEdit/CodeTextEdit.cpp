@@ -17,7 +17,7 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   setAttribute( Qt::WA_OpaquePaintEvent, true );
   setAttribute( Qt::WA_NoSystemBackground, true );
   setFrameShape( QFrame::NoFrame ); // No widget border allowed (otherwise there would be a separation
-  // line that doesn't allow this control to blend in with tabs)
+                                    // line that doesn't allow this control to blend in with tabs)
 
   // Create the vertical scrollbar and set it as "always on"
   m_verticalScrollBar = std::make_unique<ScrollBar>( this );
@@ -349,6 +349,7 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   //QAbstractScrollArea::paintEvent(event);
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
+
   if (m_document != nullptr)
     m_document->setWrapWidth(evt->size().width());
 
@@ -365,7 +366,6 @@ void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
 
   // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
   emit documentSizeChanged( newSize, lineHeight );
-  repaint();
 }
 
 void CodeTextEdit::verticalSliderValueChanged (int value) {
