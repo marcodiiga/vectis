@@ -1,0 +1,25 @@
+Reference data: BasicBlock.cpp (415 lines)
+Release version
+
+Single-Thread wrap
+Implemented on
+        commit 8fdd6406de24e3786b4550a0016ab355d486d378
+        Author: Marco A <marco.diiga@gmail.com>
+        Date:   Fri May 22 21:02:51 2015 +0200
+
+            minor fixes
+Scored:
+Minimum Wrap: 479ms
+Maximum Wrap: 0ms
+
+
+Single-Thread rendering
+Implemented on
+        commit 8fdd6406de24e3786b4550a0016ab355d486d378
+        Author: Marco A <marco.diiga@gmail.com>
+        Date:   Fri May 22 21:02:51 2015 +0200
+
+            minor fixes
+Scored:
+Maximum display: 66ms
+Minimum display: 62ms

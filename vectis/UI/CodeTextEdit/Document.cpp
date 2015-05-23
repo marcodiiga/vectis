@@ -7,6 +7,7 @@
 #include <deque>
 
 #include <QDebug>
+#include <QElapsedTimer>
 
 Document::Document(const CodeTextEdit& codeTextEdit) :
   m_codeTextEdit(codeTextEdit),
@@ -73,7 +74,9 @@ void Document::setWrapWidth(int width) {
 }
 
 void Document::recalculateDocumentLines () {
-  // qDebug() << "Recalculating document lines..";
+  // qDebug() << "Recalculating document lines..";  
+  //QElapsedTimer timer;
+  //timer.start();
 
   m_firstDocumentRecalculate = false;
 
@@ -164,7 +167,7 @@ void Document::recalculateDocumentLines () {
   // At this point the PhysicalLines vector has been populated (or is still empty)
   // and the document structure is stored in memory
 
-  // qDebug() << "Done recalculating document lines";
+  //qDebug() << "Done recalculating document lines in " << timer.elapsed() << " milliseconds";
 }
 
 

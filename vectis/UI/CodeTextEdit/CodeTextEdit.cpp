@@ -3,6 +3,7 @@
 #include <QResizeEvent>
 
 #include <QDebug>
+#include <QElapsedTimer>
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
   QAbstractScrollArea(parent),
@@ -75,6 +76,9 @@ int CodeTextEdit::getCharacterWidthPixels() const {
 
 // As the name suggests: render the entire document on the internal stored pixmap
 void CodeTextEdit::renderDocumentOnPixmap() {
+
+  //QElapsedTimer timer;
+  //timer.start();
 
   QPixmap empty(m_documentPixmap->size()); // Empty the pixmap
   m_documentPixmap->swap(empty);
@@ -222,6 +226,8 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   }
 
   m_invalidatedPixmap = false; // QPixmap has been redrawn
+
+  //qDebug() << "Done rendering document lines in " << timer.elapsed() << " milliseconds";
 }
 
 
