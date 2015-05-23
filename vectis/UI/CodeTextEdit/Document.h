@@ -60,7 +60,7 @@ private:
     // and other expensive operations until the last resize() has been triggered
     bool m_firstDocumentRecalculate;    
 
-    QString m_plainText;
+    std::vector<QString> m_plainTextLines;
     const CodeTextEdit& m_codeTextEdit;
 
     // Variables related to how the control renders lines

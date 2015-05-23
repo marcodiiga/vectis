@@ -23,3 +23,30 @@ Implemented on
 Scored:
 Maximum display: 66ms
 Minimum display: 62ms
+
+-----------------------------------------------------------
+
+Concurrent-Threaded wrap
+Implemented on
+        commit 
+        Author: Marco A <marco.diiga@gmail.com>
+        Date:   Fri May 22 21:02:51 2015 +0200
+
+            
+Scored:
+Minimum Wrap: 2ms (236X)
+Maximum Wrap: 2ms
+
+
+Single-Thread rendering
+Implemented on
+        commit 
+        Author: Marco A <marco.diiga@gmail.com>
+        Date:   Fri May 22 21:02:51 2015 +0200
+
+            
+Scored:
+Maximum display: 66ms
+Minimum display: 62ms
+
+

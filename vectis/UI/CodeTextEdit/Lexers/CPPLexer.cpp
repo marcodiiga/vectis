@@ -237,13 +237,13 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
 
   if (str->at(pos) == ':' && str->at(pos+1) == ':') { // :: makes the previous segment part of the new one
     if (styleDb->styleSegment.size() > 0)
-      m_adaptPreviousSegments.push_back(styleDb->styleSegment.size()-1);
+      m_adaptPreviousSegments.push_back(static_cast<int>(styleDb->styleSegment.size())-1);
   }
 
   if (foundSegment == false) { // We couldn't find a normal identifier
     if (str->at(pos) == '{') { // Handle entering/exiting scopes
       pos++;
-      m_scopesStack.push(m_scopesStack.size());
+      m_scopesStack.push(static_cast<int>(m_scopesStack.size()));
 
       if (m_classKeywordActiveOnScope == -1)
         m_classKeywordActiveOnScope = m_scopesStack.top(); // Joined a class scope
