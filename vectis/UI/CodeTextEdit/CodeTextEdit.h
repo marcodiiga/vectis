@@ -46,7 +46,7 @@ public:
 private:
     friend class RenderingThread;
 
-    void paintEvent(QPaintEvent *event);
+    void paintEvent(QPaintEvent *);
     void renderDocumentOnPixmap();
     std::unique_ptr<QImage> m_documentPixmap; // The rendered document
     std::unique_ptr<QImage> m_backgroundBufferPixmap; // The background buffer

@@ -237,39 +237,43 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
     textRect.setWidth(tabRect.width() - 2*h -h/4 /* This last one is for the 'x' button */);
     textRect.setY(textRect.y() + 6);
 
-    // Before drawing the text, an opacity mask is applied. This ensures a text longer than the tab itself
-    // has a nice fade-out effect before the X button
-    //
-    //   _________________
-    //  / Very long text X\
-    //    ^           ^ ^
-    //    |           | |
-    //    |           |  --- Completely faded
-    //    |            --- Starting to fade
-    //    Text not faded
-    recalculateOpacityMask (textRect); // Recalculate the tab's text opacity mask in case width has changed
-                                       // otherwise grab the cached one
+    if (textRect.width() > 0 && textRect.height() > 0) { // It doesn't make sense to render a 0-size image
 
-    // Off-screen renders the text plus opacity mask in a pixMap before actually drawing it into the control
-    QPixmap pixMap(textRect.width(),textRect.height());
-    pixMap.fill(Qt::transparent);
+      // Before drawing the text, an opacity mask is applied. This ensures a text longer than the tab itself
+      // has a nice fade-out effect before the X button
+      //
+      //   _________________
+      //  / Very long text X\
+      //    ^           ^ ^
+      //    |           | |
+      //    |           |  --- Completely faded
+      //    |            --- Starting to fade
+      //    Text not faded
+      recalculateOpacityMask (textRect); // Recalculate the tab's text opacity mask in case width has changed
+                                         // otherwise grab the cached one
 
-    QPainter textPixmapPainter(&pixMap);
-    // Choose a different color if the tab is selected or unselected
-    if( selected == true )
-        textPixmapPainter.setPen( Qt::white );
-    else
-        textPixmapPainter.setPen( QPen(QColor(193,193,191)) );
-    textPixmapPainter.drawText(pixMap.rect(), Qt::AlignLeft, QString(text)); // Draw the text on the off-screen pixmap
+      // Off-screen renders the text plus opacity mask in a pixMap before actually drawing it into the control
+      QPixmap pixMap(textRect.width(),textRect.height());
+      pixMap.fill(Qt::transparent);
 
-    // Destination (aka the pixmap with the text) is the output, its alpha is reduced by that of the source (the mask)
-    textPixmapPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+      QPainter textPixmapPainter(&pixMap);
 
-    // Draw the pre-cached alpha mask over the text rectangle to set its alpha channel
-    textPixmapPainter.drawPixmap(0,0, m_textOpacityMask->width(), m_textOpacityMask->height(), *m_textOpacityMask.get());
+      // Choose a different color if the tab is selected or unselected
+      if( selected == true )
+          textPixmapPainter.setPen( Qt::white );
+      else
+          textPixmapPainter.setPen( QPen(QColor(193,193,191)) );
+      textPixmapPainter.drawText(pixMap.rect(), Qt::AlignLeft, QString(text)); // Draw the text on the off-screen pixmap
 
-    p.drawPixmap(textRect, pixMap, pixMap.rect()); // Finally draw the pixmap with the text drawn + the right alpha mask
-                                                   // in the right textRect on the control
+      // Destination (aka the pixmap with the text) is the output, its alpha is reduced by that of the source (the mask)
+      textPixmapPainter.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+
+      // Draw the pre-cached alpha mask over the text rectangle to set its alpha channel
+      textPixmapPainter.drawPixmap(0,0, m_textOpacityMask->width(), m_textOpacityMask->height(), *m_textOpacityMask.get());
+
+      p.drawPixmap(textRect, pixMap, pixMap.rect()); // Finally draw the pixmap with the text drawn + the right alpha mask
+                                                     // in the right textRect on the control
+    }
 
     // Last element to be drawn is the exit button pixmap (the X close button)
     // Calculate the X button drawing rect (some adjustment factors have been empirically chosen)

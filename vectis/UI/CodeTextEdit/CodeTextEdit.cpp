@@ -62,15 +62,13 @@ void CodeTextEdit::loadDocument(Document *doc) {
   // Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
   // since everything needs to be rendered, not just the viewport region
   m_documentPixmap = std::make_unique<QImage>(viewport()->width(), m_document->m_numberOfEditorLines *
-                                               fontMetrics().height() + 20 /* Remember to compensate the offset */,
+                                              fontMetrics().height() + 20 /* Remember to compensate the offset */,
                                               QImage::Format_ARGB32_Premultiplied);
   m_documentMutex.unlock();
 
-
-
   m_messageQueueMutex.lock();
-  m_documentUpdateMessages.emplace_back(viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
-                                        fontMetrics().height() + 20 /* Remember to compensate the offset */);
+  m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                         fontMetrics().height() + 20 /* Remember to compensate the offset */);
   m_messageQueueMutex.unlock();
 
   if( m_renderingThread->isRunning() == false )
@@ -255,7 +253,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
 
 
 
-void CodeTextEdit::paintEvent (QPaintEvent *event) {
+void CodeTextEdit::paintEvent (QPaintEvent *) {
 
   QPainter view(viewport());
 
@@ -263,7 +261,6 @@ void CodeTextEdit::paintEvent (QPaintEvent *event) {
   const QBrush backgroundBrush(QColor(39, 40, 34));
   view.setBrush(backgroundBrush);
   view.fillRect(rect(), backgroundBrush);
-
 
   m_documentMutex.lock();
   // Apply the offset and draw the pixmap on the viewport
@@ -283,27 +280,14 @@ void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
     return;
 
   m_messageQueueMutex.lock();
-  m_documentUpdateMessages.emplace_back(evt->size().width(), viewport()->width(), m_document->m_numberOfEditorLines *
-                                        fontMetrics().height() + 20 /* Remember to compensate the offset */);
+  m_documentMutex.lock();
+  m_documentUpdateMessages.emplace_back( evt->size().width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                         fontMetrics().height() + 20 /* Remember to compensate the offset */ );
+  m_documentMutex.unlock();
   m_messageQueueMutex.unlock();
 
   if( m_renderingThread->isRunning() == false )
       m_renderingThread->start();
-//  m_document->setWrapWidth(evt->size().width());
-
-//  m_backgroundBufferPixmap = std::make_unique<QPixmap>(viewport()->width(), m_document->m_numberOfEditorLines *
-//                                                       fontMetrics().height() + 20 /* Remember to compensate the offset */);
-//  m_invalidatedPixmap = true;
-
-//  // Even if the document's size might not have changed, we still need to fire a documentSizeChanged
-//  // event since scrollbars use this also to calculate the maximum number of lines our viewport can display
-//  QSizeF newSize;
-//  qreal lineHeight = fontMetrics().height();
-//  newSize.setHeight( m_document->m_numberOfEditorLines );
-//  newSize.setWidth ( m_document->m_maximumCharactersLine );
-
-//  // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
-//  emit documentSizeChanged( newSize, lineHeight );
 }
 
 void CodeTextEdit::verticalSliderValueChanged (int value) {
@@ -315,49 +299,24 @@ void CodeTextEdit::verticalSliderValueChanged (int value) {
 void CodeTextEdit::documentSizeChangedFromThread(const QSizeF &newSize, const qreal lineHeight) {
   emit documentSizeChanged( newSize, lineHeight ); // Forward the signal to our QScrollBar
   this->repaint();
-
 }
 
-/*
-
-Design for the code editor (main component for code editing)
-------------------------------------------------------------
-
-
-
-// We can't directly subclass a QPlainTextEdit, we need to render everything in the control.
-class Control : public QAbstractScrollArea {
-  paintEvent() {
-    QPainter painter(this->viewport());
-    
-    foreach visible line (only draw a subset of the file)
-      DrawLine()
-  }
-  DrawLine() {
-    // There will be multiple phases for drawing, e.g. background then edges, then text..
-    draw every word in the line according to its formatting (a lexer might read keywords and the
-      style might be set afterwards) with clipping (nowrap) or without clipping (wrap)
-  }
-};
-
-
-
-
-
-
-
-
-*/
-
+///////////////////////////////////////////////
+///            RenderingThread              ///
+///////////////////////////////////////////////
 
 void RenderingThread::run() {
 
   while(getFrontElement() == true) {
+    m_cte.m_documentMutex.lock();
     m_cte.m_document->setWrapWidth(m_currentElement.wrapWidth);
+    m_cte.m_documentMutex.unlock();
 
     m_cte.m_backgroundBufferPixmap = std::make_unique<QImage>(m_currentElement.bufferWidth,
-                                                               m_currentElement.bufferHeight,
-                                                              QImage::Format_ARGB32_Premultiplied);
+                                                              m_currentElement.bufferHeight,
+                                                              QImage::Format_ARGB32_Premultiplied);    
+
+    m_cte.renderDocumentOnPixmap();
 
     // Even if the document's size might not have changed, we still need to fire a documentSizeChanged
     // event since scrollbars use this also to calculate the maximum number of lines our viewport can display
@@ -365,8 +324,6 @@ void RenderingThread::run() {
     qreal lineHeight = m_cte.fontMetrics().height();
     newSize.setHeight( m_cte.m_document->m_numberOfEditorLines );
     newSize.setWidth ( m_cte.m_document->m_maximumCharactersLine );
-
-    m_cte.renderDocumentOnPixmap();
 
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
     emit documentSizeChangedFromThread ( newSize, lineHeight );
