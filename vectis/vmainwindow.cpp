@@ -110,10 +110,14 @@ void VMainWindow::selectedTabChangedSlot(int newId) {
 }
 
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
-  //    qDebug() << "Tab was requested to close: " << tabId;
-  //    m_tabsBar->deleteTab(tabId);
-  //    if (tabId == currentlySelected) {
-  //      m_customCodeEdit->setText("");
+  qDebug() << "Tab was requested to close: " << tabId;
+  m_tabsBar->deleteTab(tabId);
+  auto it = m_tabDocumentMap.find(tabId);
+  m_tabDocumentMap.erase(it);
+  if(m_tabDocumentMap.empty())
+    m_customCodeEdit->unloadDocument();
+  // if (tabId == currentlySelected) {
+  //  m_customCodeEdit->setText("");
   //      currentlySelected = m_tabsBar->getSelectedTabId();
   //    }
   //    contents.erase(tabId);

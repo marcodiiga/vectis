@@ -49,6 +49,19 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
           this, SLOT(documentSizeChangedFromThread(const QSizeF&, const qreal)));
 }
 
+void CodeTextEdit::unloadDocument() {
+  if (m_renderingThread->isRunning() == true)
+    m_renderingThread->wait(); // Wait for all drawing operations to finish
+
+  m_documentMutex.lock();
+  m_document = nullptr;
+  m_documentPixmap.release();
+  m_renderingThread.release();
+  m_documentMutex.unlock();
+  emit documentSizeChanged( QSizeF(), fontMetrics().height() );
+  repaint();
+}
+
 void CodeTextEdit::loadDocument(Document *doc) {
   if (m_renderingThread->isRunning() == true)
     m_renderingThread->wait(); // Wait for all drawing operations to finish
@@ -263,15 +276,17 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
   view.fillRect(rect(), backgroundBrush);
 
   m_documentMutex.lock();
-  // Apply the offset and draw the pixmap on the viewport
-  int scrollOffset = m_sliderValue * fontMetrics().height();
-  QRectF pixmapRequestedRect(m_documentPixmap->rect().x(), m_documentPixmap->rect().y() + scrollOffset,
-                             m_documentPixmap->rect().width(), viewport()->height());
-  QRectF myViewRect = viewport()->rect();
-  myViewRect.setWidth(pixmapRequestedRect.width());
+  if (m_document != nullptr) {
+    // Apply the offset and draw the pixmap on the viewport
+    int scrollOffset = m_sliderValue * fontMetrics().height();
+    QRectF pixmapRequestedRect(m_documentPixmap->rect().x(), m_documentPixmap->rect().y() + scrollOffset,
+                               m_documentPixmap->rect().width(), viewport()->height());
+    QRectF myViewRect = viewport()->rect();
+    myViewRect.setWidth(pixmapRequestedRect.width());
 
-  view.drawImage(myViewRect, *m_documentPixmap, pixmapRequestedRect);
-  //view.drawPixmap (myViewRect, *m_documentPixmap, pixmapRequestedRect);
+    view.drawImage(myViewRect, *m_documentPixmap, pixmapRequestedRect);
+    //view.drawPixmap (myViewRect, *m_documentPixmap, pixmapRequestedRect);
+  }
   m_documentMutex.unlock();
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {

@@ -40,6 +40,7 @@ public:
     explicit CodeTextEdit(QWidget *parent = 0);
 
     void loadDocument(Document *doc);
+    void unloadDocument();
     int getViewportWidth() const;
     int getCharacterWidthPixels() const;
 
