@@ -101,9 +101,12 @@ void ScrollBar::mousePressEvent ( QMouseEvent *e ) {
 // slider position that was stored before the tracking (so that we're not modifying its position)
 void ScrollBar::mouseMoveEvent ( QMouseEvent *e ) {
   if ( m_sliderIsBeingDragged == true ) {
-    // x : m_internalLineCount = delta : this->rect().height()
+    // It is important to note that even if the mouse did a complete document tracking (i.e. from line 0 to the last
+    // one), its path's length would NOT be equal to the control rect().height() since the slider's length would have
+    // to be subtracted. This can be easily visualized on a piece of paper. The right proportion is therefore:
+    // x : m_internalLineCount = delta : (this->rect().height() - sliderLength)
     int delta = ( e->pos().y() - m_mouseTrackingStartPoint );
-    int x = static_cast<int>( delta * m_internalLineCount / this->rect().height() );
+    int x = static_cast<int>( delta * m_internalLineCount / (this->rect().height() - m_lenSlider) );
     setSliderPosition(m_mouseTrackingStartValue + x);
   }
 }
@@ -158,7 +161,7 @@ void ScrollBar::actionTriggered ( int action ) {
 
 // When the control is resized, the maximum number of lines we can display into the view is updated as well
 void ScrollBar::resizeEvent ( QResizeEvent * event ) {
-   qDebug() << "TODO: resizeEvent for the ScrollBar, is it useful setMaximum here? If docSizeChange is enough, remove it";
+   // qDebug() << "TODO: resizeEvent for the ScrollBar, is it useful setMaximum here? If docSizeChange is enough, remove it";
    // setMaximum( m_internalLineCount * m_textLineHeight );
     //qDebug() << "resizeEvent: maximum updated to: " << maximum();
     //qDebug() << "m_maxNumLines is now " << m_maxNumLines;
@@ -238,18 +241,18 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
     //            " rectAbsPos = " << rectAbsPos;
 
     // Calculate the length of the slider's rect including extraBottomLines
-    int lenSlider = int( float(rect().height()) * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines)) );
+    m_lenSlider = int( float(rect().height()) * (float(m_maxViewVisibleLines) / float(m_internalLineCount + extraBottomLines)) );
 
     // Set a mimumim length for the slider (when there are LOTS of lines)
-    if( lenSlider < 15 )
-        lenSlider = 15;
+    if( m_lenSlider < 15 )
+        m_lenSlider = 15;
 
     // Prevents the slider to be drawn, due to roundoff errors, outside the scrollbar rectangle
-    if( rectAbsPos + lenSlider > rect().height() )
-        rectAbsPos -= ( rectAbsPos + lenSlider ) - rect().height();
+    if( rectAbsPos + m_lenSlider > rect().height() )
+        rectAbsPos -= ( rectAbsPos + m_lenSlider ) - rect().height();
 
     // This is finally the drawing area for the slider
-    QRect rcSlider(0, rectAbsPos, rect().width() - 1, lenSlider );
+    QRect rcSlider(0, rectAbsPos, rect().width() - 1, m_lenSlider );
     // p.fillRect( rcSlider, QColor( 55, 4, 255, 100 ) );
 
     // >> ------------------------

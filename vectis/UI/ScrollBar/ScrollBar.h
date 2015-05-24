@@ -41,7 +41,9 @@ private:
     bool  m_sliderIsBeingDragged;
     int   m_mouseTrackingStartPoint;
     int   m_mouseTrackingStartValue;
-    QPainterPath m_sliderPath;
+    QPainterPath m_sliderPath; // The path where the slider was drawn, useful for mouse intersection tests
+    int m_lenSlider; // The absolute rect length of the slider, needed for some tracking calculations
+
     PgKeyEater m_pgKeyEater;
 
     friend class PgKeyEater; // Filter needs access to m_scrollAnim to indicate whether at the end of the

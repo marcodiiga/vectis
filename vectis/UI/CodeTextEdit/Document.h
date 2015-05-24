@@ -54,6 +54,8 @@ public:
 
 private:
     friend class CodeTextEdit;
+    friend class RenderingThread;
+
     void recalculateDocumentLines();
     // Qt hasn't a reliable way to detect whether all widgets have reached their stable
     // dimension (i.e. all resize() have been triggered), thus we delay syntax highlighting

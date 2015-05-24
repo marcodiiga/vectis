@@ -155,7 +155,7 @@ void TabsBar::recalculateOpacityMask(QRectF newTabRect) {
   if (m_textOpacityMask && newTabRect.width() == m_textOpacityMask->width())
     return; // Nothing has changed
 
-  qDebug() << "Recalculating tab opacity mask (changed to" << newTabRect.width() << ")";
+  // qDebug() << "Recalculating tab opacity mask (changed to" << newTabRect.width() << ")";
   // Recalculate the gradient opacity mask for the text that goes on the tabs
   m_textOpacityMask.reset(new QPixmap(newTabRect.width(),newTabRect.height()));
   m_textOpacityMask->fill(Qt::transparent);
