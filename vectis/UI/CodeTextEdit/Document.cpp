@@ -102,7 +102,7 @@ void Document::recalculateDocumentLines () {
       m_plainText.append(line);
       m_plainText += '\n';
     }
-    m_lexer->lexInput(m_plainText.toStdString(), m_styleDb);
+    m_lexer->lexInput(std::move(m_plainText.toStdString()), m_styleDb);
     m_needReLexing = false;
   }
 

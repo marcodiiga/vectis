@@ -11,7 +11,7 @@ public:
   CPPLexer();
 
   void reset() override;
-  void lexInput(std::string& input, StyleDatabase& sdb) override;
+  void lexInput(std::string input, StyleDatabase& sdb) override;
 
 private:
   //// States the lexer can find itself into

@@ -235,7 +235,7 @@ void ScrollBar::paintEvent ( QPaintEvent* ) {
 
     // now find the absolute position in the control's rect, the proportion is:
     //  rect().height() : x = m_maxViewVisibleLines : viewRelativePos
-    float rectAbsPos = (float(rect().height()) * viewRelativePos) / float(m_maxViewVisibleLines);    
+    float rectAbsPos = (float(rect().height()) * viewRelativePos) / float(m_maxViewVisibleLines);
 
     // qDebug() << "maxNumLines is " << maxNumLines << " and viewRelativePos is = " << viewRelativePos <<
     //            " rectAbsPos = " << rectAbsPos;

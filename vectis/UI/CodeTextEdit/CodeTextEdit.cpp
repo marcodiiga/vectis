@@ -19,12 +19,13 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   setAttribute( Qt::WA_NoSystemBackground, true );
   setFrameShape( QFrame::NoFrame ); // No widget border allowed (otherwise there would be a separation
                                     // line that doesn't allow this control to blend in with tabs)
-  setStyleSheet( "QWidget { background-color: rgb(22,23,19); }" );
+  setStyleSheet( "QWidget { background-color: rgb(22,23,19);     \
+                            padding: 0px; }" ); // Also eliminate padding (needed to avoid QScrollBar spaces)
 
   // Create the vertical scrollbar and set it as "always on"
   m_verticalScrollBar = std::make_unique<ScrollBar>( this );
   this->setVerticalScrollBar( m_verticalScrollBar.get() );
-  setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
+  this->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
 
   // Set a font to use in this control
   // Consolas is installed by default on every Windows system, but not Linux. On Linux the
@@ -143,8 +144,8 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   QPointF startpoint(5, 20);
   size_t documentRelativePos = 0;
   size_t lineRelativePos = 0;
-  auto& styleIt = m_document->m_styleDb.styleSegment.begin();
-  auto& styleEnd = m_document->m_styleDb.styleSegment.end();
+  auto styleIt = m_document->m_styleDb.styleSegment.begin();
+  auto styleEnd = m_document->m_styleDb.styleSegment.end();
   size_t nextDestination = -1;
 
   auto calculateNextDestination = [&]() {

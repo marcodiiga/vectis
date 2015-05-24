@@ -48,7 +48,7 @@ public:
   static LexerBase *createLexerOfType(LexerType t);
 
   virtual void reset() = 0;
-  virtual void lexInput(std::string& input, StyleDatabase& sdb) = 0;
+  virtual void lexInput(std::string input, StyleDatabase& sdb) = 0;
 
 private:
   LexerType m_type;

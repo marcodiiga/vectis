@@ -121,7 +121,7 @@ void CPPLexer::reset() {
   m_adaptPreviousSegments.clear();
 }
 
-void CPPLexer::lexInput(std::string& input, StyleDatabase& sdb) {
+void CPPLexer::lexInput(std::string input, StyleDatabase& sdb) {
 
   str = &input;
   sdb.styleSegment.clear(); // Relex everything // TODO - lex from a position forward?
