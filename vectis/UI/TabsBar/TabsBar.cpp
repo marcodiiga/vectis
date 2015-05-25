@@ -78,8 +78,7 @@ void TabsBar::deleteTab(int id, bool animation) {
     return; // No tabs to delete
 
   auto tabIdMapIterator = m_tabId2tabIndexMap.find(id);
-  bool validId = tabIdMapIterator != m_tabId2tabIndexMap.end();
-  Q_ASSERT(validId == true);
+  Q_ASSERT( tabIdMapIterator != m_tabId2tabIndexMap.end() );
 
   int deleteTabIndex = tabIdMapIterator->second;
   int deleteTabId = id;
