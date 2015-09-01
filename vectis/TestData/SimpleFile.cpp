@@ -37,7 +37,7 @@ protected:
 };
 
 int testClass::lolfunc() {
-	stamazza::lol();
+	accessoryClass::lol();
 }
 
 struct CUSTOMTYPE {
@@ -55,9 +55,9 @@ class ADerived : public testClass {
 };
 
 template<typename T, int dd = 23>
-class flyforever : private Somethingelse<T> {
+class ILoveMosquitoes : private Somethingelse<T> {
 	T cool = "hello world";
-	T cool2 = 'darnit';
+	T cool2 = 'nope';
 };
 
 DARNIT();
