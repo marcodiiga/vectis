@@ -1,0 +1,20 @@
+To build skia:
+--------------
+mkdir skia
+cd skia
+gclient config --name . --unmanaged https://skia.googlesource.com/skia.git
+gclient sync
+git checkout master
+python gyp_skia -Dskia_arch_type=x86_64
+ninja -C out\Debug dm
+
+Generating CMake files instead of ninja ones
+--------------------------------------------
+GYP is included in third_party with the repository and called from the gyp_skia.py script
+
+From inside the main skia directory, one can run gyp and generate CMake files
+C:\root_to_dir\vectis\deps\skia>"C:\Users\Alex\Desktop\vectis\vectis\deps\skia\third_party\externals/gyp/gyp" -Dskia_arch_type=x86_64 skia.gyp -IC://Users//Alex//Desktop//vectis//vectis//deps//skia//gyp//common.gypi --depth . --generator-output C://Users//Alex//Desktop//vectis//vectis//deps//skia//out -Goutput_dir=. -Gdefault_target=most -f cmake
+
+This will generate a CMakeLists.txt file into the skia/out/[configuration] directory. Some stupid errors (e.g. \\ that need to be converted to /) will pop up but CMake will eventually accept it and generate a sln file or whatever asked to.
+
+There are also some linking errors related to how .asm files are compiled.
