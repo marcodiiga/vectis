@@ -39,13 +39,15 @@ class CodeTextEdit : public QAbstractScrollArea {
 public:
     explicit CodeTextEdit(QWidget *parent = 0);
 
-    void loadDocument(Document *doc);
+    // Load a document into the viewport
+    void loadDocument(Document *doc, int VScrollbarPos = 0);
     void unloadDocument();
     int getViewportWidth() const;
     int getCharacterWidthPixels() const;
 
 private:
     friend class RenderingThread;
+    friend class VMainWindow; // Needs access to manipulate document and scrollbar positions
 
     void paintEvent(QPaintEvent *);
     void renderDocumentOnPixmap();
@@ -71,7 +73,7 @@ private slots:
     void verticalSliderValueChanged( int value );
     void documentSizeChangedFromThread( const QSizeF& newSize, const qreal lineHeight );
 signals:
-    void documentSizeChanged( const QSizeF& newSize, const qreal lineHeight );
+    void documentSizeChanged( const QSizeF& newSize, const qreal lineHeight, const int verticalSliderPos );
 };
 
 #endif // CUSTOMCODEEDIT_H

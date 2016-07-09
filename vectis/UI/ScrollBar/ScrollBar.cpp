@@ -51,8 +51,8 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
                            }"));
 
     // Only way to detect when line wrapping inserts additional lines is through documentSizeChanged()
-    connect( m_parent, SIGNAL(documentSizeChanged(const QSizeF&, const qreal)),
-            this, SLOT(documentSizeChanged(const QSizeF&, const qreal)) );
+    connect( m_parent, SIGNAL(documentSizeChanged(const QSizeF&, const qreal, const int)),
+             this, SLOT(documentSizeChanged(const QSizeF&, const qreal, const int)) );
 
     // Handling signals scroll mouse / page down-up / dragging (tracking)
     connect(this, SIGNAL(actionTriggered(int)), this, SLOT(actionTriggered(int)));
@@ -184,8 +184,8 @@ void ScrollBar::sliderChange ( SliderChange change ) {
     QAbstractSlider::sliderChange(change);
 }
 
-// Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active
-void ScrollBar::documentSizeChanged(const QSizeF & newSize, const qreal lineHeight) {
+// Emitted when the document changes size, it is the only way to detect the number of lines in the document if wrapping is active.
+void ScrollBar::documentSizeChanged(const QSizeF& newSize, const qreal lineHeight, const int verticalSliderPos) {
 
     // Useful information:
     // - The hierarchy used to find the parent QPlainTextEdit widget is:
@@ -208,6 +208,8 @@ void ScrollBar::documentSizeChanged(const QSizeF & newSize, const qreal lineHeig
     m_internalLineCount = int( newSize.height() );
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     setMaximum( m_internalLineCount - 1 );
+    // Clamp and update slider position
+    setValue(std::min(verticalSliderPos, maximum()));
     // qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxViewVisibleLines << " m_internalLineCount "
     //  << m_internalLineCount;
 }

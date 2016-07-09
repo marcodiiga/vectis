@@ -60,16 +60,19 @@ void CodeTextEdit::unloadDocument() {
   m_documentPixmap.release();
   m_renderingThread.release();
   m_documentMutex.unlock();
-  emit documentSizeChanged( QSizeF(), fontMetrics().height() );
+  emit documentSizeChanged( QSizeF(), fontMetrics().height(), 0 );
   repaint();
 }
 
-void CodeTextEdit::loadDocument(Document *doc) {
+void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
   if (m_renderingThread->isRunning() == true)
     m_renderingThread->wait(); // Wait for all drawing operations to finish
 
   m_documentMutex.lock();
   m_document = doc;
+
+  // Save the scrollbar position if we have one
+  m_document->m_storeSliderPos = VScrollbarPos;
 
   // Calculate the new document size
   m_document->recalculateDocumentLines();
@@ -87,7 +90,7 @@ void CodeTextEdit::loadDocument(Document *doc) {
   m_messageQueueMutex.unlock();
 
   if( m_renderingThread->isRunning() == false )
-      m_renderingThread->start();
+      m_renderingThread->start();  
 
 //  QSizeF newSize;
 //  newSize.setHeight( m_document->m_numberOfEditorLines );
@@ -314,7 +317,7 @@ void CodeTextEdit::verticalSliderValueChanged (int value) {
 }
 
 void CodeTextEdit::documentSizeChangedFromThread(const QSizeF &newSize, const qreal lineHeight) {
-  emit documentSizeChanged( newSize, lineHeight ); // Forward the signal to our QScrollBar
+  emit documentSizeChanged( newSize, lineHeight, m_document->m_storeSliderPos ); // Forward the signal to our QScrollBar
   this->repaint();
 }
 

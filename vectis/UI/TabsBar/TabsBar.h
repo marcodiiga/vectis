@@ -154,12 +154,15 @@ private:
     std::unique_ptr<QPixmap> m_textOpacityMask;
     void recalculateOpacityMask(QRectF newTabRect);
 
-    void emitSelectionHasChanged(int);
+    // Emit a signal of selection changed (notice that the parameters are tab IDs, not relative indices into the tabs bar).
+    // oldTabIdIndex can be -1 if the old tab is no longer available (i.e. deleted) or if there were no one (a first tab
+    // ever has been created)
+    void emitSelectionHasChanged(int /* old tab index */ oldTabIdIndex, int /* new tab index */ newTabIdIndex);
 
 signals:
     // As the name suggests, this might be useful to signal a view refresh.
-    // Sends the id of the newly selected tab
-    void selectedTabHasChanged(int newTabId);
+    // Sends the id of the newly selected tab (and of the old one)
+    void selectedTabHasChanged(int oldTabId, int newTabId);
     // Sends the id of the tab which has been asked to close down (it hasn't been closed yet)
     void tabWasRequestedToClose(int tabId);
 };

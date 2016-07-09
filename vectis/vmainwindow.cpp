@@ -16,9 +16,9 @@ VMainWindow::VMainWindow(QWidget *parent) :
 {
   // Set the window maximize / minimize / exit buttons
   Qt::WindowFlags flags = Qt::Window   |
-      Qt::WindowMaximizeButtonHint |
-      Qt::WindowMinimizeButtonHint |
-      Qt::WindowCloseButtonHint;
+                          Qt::WindowMaximizeButtonHint |
+                          Qt::WindowMinimizeButtonHint |
+                          Qt::WindowCloseButtonHint;
   this->setWindowFlags(flags);
   // Set the background color for window. Notice: style sheets are
   // more portable than modifying the palette directly
@@ -59,8 +59,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
   // NOTICE: link connections AFTER all initial documents have been created
   // Link the "changed selected tab" and "tab was requested to close" signals to slots
-  connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int)),
-          this, SLOT(selectedTabChangedSlot(int)));
+  connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int, int)),
+          this, SLOT(selectedTabChangedSlot(int, int)));
   connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
           this, SLOT(tabWasRequestedToCloseSlot(int)));
 
@@ -92,10 +92,22 @@ void VMainWindow::paintEvent(QPaintEvent *)
 }
 
 
-void VMainWindow::selectedTabChangedSlot(int newId) {
-  qDebug() << "Selected tab has changed to " << newId;
+void VMainWindow::selectedTabChangedSlot(int oldId, int newId) {
+  qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
 
-  m_customCodeEdit->loadDocument( m_tabDocumentMap[newId].get() );
+
+  // Save current vertical scrollbar position (there is always a vscrollbar) before switching document
+  if (oldId != -1)
+    m_tabDocumentVScrollPos[oldId] = m_customCodeEdit->m_verticalScrollBar->value();
+
+  // Restore (if any) vertical scrollbar position
+  auto it = m_tabDocumentVScrollPos.find(newId);
+  int vScrollbarPos = 0;
+  if (it != m_tabDocumentVScrollPos.end())
+    vScrollbarPos = it->second;
+
+  // Finally load the new requested document
+  m_customCodeEdit->loadDocument( m_tabDocumentMap[newId].get(), vScrollbarPos );
 
 
 

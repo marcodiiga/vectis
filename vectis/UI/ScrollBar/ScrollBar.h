@@ -6,6 +6,8 @@
 #include <QPropertyAnimation>
 
 class ScrollBar;
+class CodeTextEdit;
+
 // This class "eats" PageUp/PageDown events from the QTextEdit widget to avoid interrupting the
 // animation due to the caret being moved that modifies value()
 class PgKeyEater : public QObject {
@@ -44,6 +46,9 @@ private:
     QPainterPath m_sliderPath; // The path where the slider was drawn, useful for mouse intersection tests
     int m_lenSlider; // The absolute rect length of the slider, needed for some tracking calculations
 
+    friend class CodeTextEdit;
+    int m_lastKnownSliderPosition; // Last known slider position
+
     PgKeyEater m_pgKeyEater;
 
     friend class PgKeyEater; // Filter needs access to m_scrollAnim to indicate whether at the end of the
@@ -51,7 +56,7 @@ private:
 
 private slots: // Consult the respective definitions for a thoroughly documentation of these methods,
                // they're not part of an external interface
-    void documentSizeChanged ( const QSizeF & newSize, const qreal lineHeight );
+    void documentSizeChanged (const QSizeF & newSize, const qreal lineHeight , const int verticalSliderPos);
     //void sliderPressed ();
     //void sliderReleased ();
     void actionTriggered ( int action );

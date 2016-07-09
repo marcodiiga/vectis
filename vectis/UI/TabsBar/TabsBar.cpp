@@ -65,8 +65,10 @@ int TabsBar::insertTab(const QString text, bool animation) {
       m_YInterpolators[newTabIndex]->start();
     }
 
-    m_selectedTabIndex = newTabIndex; // Also make it the new selected one
-    emitSelectionHasChanged (m_selectedTabIndex); // Signal that the selection has changed
+    auto oldTabIdIndex = (m_selectedTabIndex != -1) ? m_tabs[m_selectedTabIndex]->getTabId() : -1;
+    m_selectedTabIndex = newTabIndex; // Make it the new selected one
+    auto newTabIdIndex = m_tabs[m_selectedTabIndex]->getTabId();
+    emitSelectionHasChanged (oldTabIdIndex, newTabIdIndex); // Signal that the selection has changed
     repaint();
 
     return newId;
@@ -115,9 +117,12 @@ void TabsBar::deleteTab(int id, bool animation) {
         if (tabsBar.m_selectedTabIndex >= tabsBar.m_tabs.size())
           tabsBar.m_selectedTabIndex = static_cast<int>(tabsBar.m_tabs.size()) - 1;
       }
-      if (tabsBar.m_selectedTabIndex != -1) // Do not emit any new selection signal for "no more tabs"
-        tabsBar.emitSelectionHasChanged(tabsBar.m_selectedTabIndex); // Signal that now it would be a good time to
-                                                                     // update a view with the new selection
+      if (tabsBar.m_selectedTabIndex != -1) { // Do not emit any new selection signal for "no more tabs"
+        auto oldTabIdIndex = -1;
+        auto newTabIdIndex = tabsBar.m_tabs[tabsBar.m_selectedTabIndex]->getTabId();
+        tabsBar.emitSelectionHasChanged(oldTabIdIndex, newTabIdIndex); // Signal that now it would be a good time to
+                                                                       // update a view with the new selection
+      }
     } else { // Keep the selected one active
       // Do NOT reload the document here (no new selection)
       if (delTabIndex  < tabsBar.m_selectedTabIndex)
@@ -457,8 +462,10 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
                     // deleteTab(m_tabs[i]->getTabId());
                     emit tabWasRequestedToClose (m_tabs[i]->getTabId());
                 } else { // New selection
-                    m_selectedTabIndex = i;
-                    emitSelectionHasChanged (m_selectedTabIndex); // Signal that the selection has changed
+                    auto oldTabIdIndex = (m_selectedTabIndex != -1) ? m_tabs[m_selectedTabIndex]->getTabId() : -1;
+                    m_selectedTabIndex = i; // New selection
+                    auto newTabIdIndex = m_tabs[m_selectedTabIndex]->getTabId();
+                    emitSelectionHasChanged (oldTabIdIndex, newTabIdIndex); // Signal that the selection has changed
                     repaint();                    
                 }
             }
@@ -617,9 +624,9 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *) {
 }
 
 // Emits a selection changed signal (and passes the id to the user)
-void TabsBar::emitSelectionHasChanged(int newIndex) {
-    Q_ASSERT(newIndex != -1);
-    emit selectedTabHasChanged(m_tabs[newIndex]->getTabId());
+void TabsBar::emitSelectionHasChanged(int oldTabIdIndex, int newTabIdIndex) {
+    Q_ASSERT(newTabIdIndex != -1);
+    emit selectedTabHasChanged(oldTabIdIndex, newTabIdIndex);
 }
 
 SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, int associatedTabIndex , bool isHorizontalOffset) :

@@ -35,15 +35,22 @@ public:
     tabTestFilter ttf; // DEBUG
 
 private slots:
-    void selectedTabChangedSlot(int newId);
+    void selectedTabChangedSlot(int oldId, int newId);
     void tabWasRequestedToCloseSlot(int tabId);
 
 private:
 
     Ui::VMainWindow *ui;
-    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
-    std::unique_ptr<CodeTextEdit> m_customCodeEdit;    
+
+    // Window controls
+    std::unique_ptr<CodeTextEdit> m_customCodeEdit;
     std::unique_ptr<TabsBar>      m_tabsBar;
+
+    // A map associating Documents to tab ids (which are also document ids)
+    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
+    // A map that stores the vertical scrollbar position for each document (to remember it)
+    std::map<int /* Document/Tab id */, int> m_tabDocumentVScrollPos;
+
 };
 
 #endif // VMAINWINDOW_H

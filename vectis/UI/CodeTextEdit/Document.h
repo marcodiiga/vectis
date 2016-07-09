@@ -75,6 +75,15 @@ private:
     bool m_needReLexing; // Whether the document needs re-lexing
     std::vector<PhysicalLine> m_physicalLines;
     StyleDatabase m_styleDb;
+
+    // Variable document-specific
+    struct {
+      int x = 0;
+      int y = 0;
+    } m_cursorPos; // Latest known cursor position
+
+    int m_storeSliderPos = -1; // This variable is used to store the slider position when this document
+                               // is either switched off or put on hold
 };
 
 #endif // DOCUMENT_H
