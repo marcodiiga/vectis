@@ -156,7 +156,7 @@ void TabsBar::recalculateOpacityMask(QRectF newTabRect) {
 
   // qDebug() << "Recalculating tab opacity mask (changed to" << newTabRect.width() << ")";
   // Recalculate the gradient opacity mask for the text that goes on the tabs
-  m_textOpacityMask.reset(new QPixmap(newTabRect.width(),newTabRect.height()));
+  m_textOpacityMask.reset(new QPixmap(newTabRect.width(), newTabRect.height()));
   m_textOpacityMask->fill(Qt::transparent);
 
   const QPoint start(0, 0);
@@ -164,7 +164,7 @@ void TabsBar::recalculateOpacityMask(QRectF newTabRect) {
   QLinearGradient gradient(start, end);
   gradient.setColorAt(0.0, Qt::white);
   gradient.setColorAt(0.8, Qt::white);
-  gradient.setColorAt(1.0, Qt::transparent);
+  gradient.setColorAt(0.95 /* Allow some space for the X button */, Qt::transparent);
 
   QPainter painter(m_textOpacityMask.get());
   painter.fillRect(m_textOpacityMask->rect(), gradient);
@@ -194,13 +194,13 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
     // 0;h              h;h
     QPainterPath tabPath, closeButtonPath;
     p.setRenderHint(QPainter::Antialiasing);
-    const QPointF c1(0.6f, 1.0f-0.01f), c2(0.53f, 1.0f-1.0f);
-    const int h = tabRect.height();
+    const QPointF c1(0.6f, 1.0f-0.01f), c2(0.64f, 1.0f-1.0f);
+    const int h = tabRect.height() / 1.1 /* Adjustment factor to make bezièr narrower */;
     tabPath.moveTo(tabRect.x(), tabRect.y() + tabRect.height() + 1); // QRect has 1px borders, compensation
     //qDebug() << selectedTabRect.x() << " " << selectedTabRect.y() + selectedTabRect.height() + 1;
     tabPath.cubicTo(tabRect.x() + h * c1.x(), tabRect.y() + h * c1.y(),
-                 tabRect.x() + h * c2.x(), tabRect.y() + h * c2.y(),
-                 tabRect.x() + h, tabRect.y()); // Destination point
+                    tabRect.x() + h * c2.x(), tabRect.y() + h * c2.y(),
+                    tabRect.x() + h, tabRect.y()); // Destination point
     //qDebug() << selectedTabRect.x() + h << " " << selectedTabRect.y();
 
     int dxStartBez = tabRect.x() + tabRect.width() - h;
@@ -234,7 +234,7 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
     QRectF textRect = tabRect;
     textRect.setX(tabRect.x() + h);
     textRect.setWidth(tabRect.width() - 2*h -h/4 /* This last one is for the 'x' button */);
-    textRect.setY(textRect.y() + 6);
+    textRect.setY(textRect.y() + 4);
 
     if (textRect.width() > 0 && textRect.height() > 0) { // It doesn't make sense to render a 0-size image
 
@@ -277,7 +277,7 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
     // Last element to be drawn is the exit button pixmap (the X close button)
     // Calculate the X button drawing rect (some adjustment factors have been empirically chosen)
     QRectF xRect = tabRect;
-    xRect.setX( textRect.x() + textRect.width() + h/4 - 2 );
+    xRect.setX( textRect.x() + textRect.width() + h/4 - 5 );
     xRect.setWidth( h/6 + 4 );
     xRect.setY( xRect.y() + xRect.height() / 2 - h/8 - 2 );
     xRect.setHeight( h/6 + 4 );
@@ -396,7 +396,7 @@ void TabsBar::paintEvent ( QPaintEvent* ) {
           standardTabRectLambda.setWidth( tabWidth );
 
           TabPaths&& temp = drawTabInsideRect( p, standardTabRectLambda, false, m_tabs[i]->m_title,
-                                             m_mouseHoveringCloseBtnTabIndex == i);
+                                               m_mouseHoveringCloseBtnTabIndex == i);
 
           m_tabs[i]->m_region = temp.tabRegion;
           m_tabs[i]->m_closeBtnRegion = temp.closeBtnRegion;

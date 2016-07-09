@@ -32,7 +32,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
   // Create the TabsBar
   m_tabsBar = std::make_unique<TabsBar>(this);
   //TabsBar ea;
-  m_tabsBar->setFixedHeight(35);
+  m_tabsBar->setFixedHeight(30);
   //m_tabsBar->insertTab("test tab", false);
   //m_tabsBar->insertTab("another tab", false);
   ui->codeTextEditArea->addWidget(m_tabsBar.get());
@@ -43,7 +43,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  int id = m_tabsBar->insertTab("SimpleFile.cpp", false);
+  int id = m_tabsBar->insertTab("SimpleFileWithALongNameForAGreaterJustice.cpp", false);
   auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(*m_customCodeEdit)));
   it.first->second->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
   it.first->second->applySyntaxHighlight( CPP );

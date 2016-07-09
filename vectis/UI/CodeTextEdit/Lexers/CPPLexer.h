@@ -32,6 +32,7 @@ private:
   void classDeclarationOrDefinition();
   void declarationOrDefinition();
   void defineStatement();
+  void nondefinePreprocessorStatement();
   void lineCommentStatement();
   void usingStatement();
   void includeStatement();

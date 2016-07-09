@@ -26,6 +26,8 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   m_verticalScrollBar = std::make_unique<ScrollBar>( this );
   this->setVerticalScrollBar( m_verticalScrollBar.get() );
   this->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
+  this->verticalScrollBar()->setSingleStep(5);
+  this->verticalScrollBar()->setPageStep(50);
 
   // Set a font to use in this control
   // Consolas is installed by default on every Windows system, but not Linux. On Linux the

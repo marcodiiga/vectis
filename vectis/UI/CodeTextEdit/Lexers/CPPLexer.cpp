@@ -429,6 +429,31 @@ void CPPLexer::defineStatement() {
   // Do not add the \n to the comment (it will be handled outside)
 }
 
+void CPPLexer::nondefinePreprocessorStatement() {
+
+    std::vector<std::string> preprocessorTokens = {
+      "if",
+      "ifdef",
+      "ifndef",
+      "else",
+      "elif",
+      "endif",
+      "pragma"
+    };
+
+    auto startSharp = pos; // #
+    ++pos;
+
+    // Find a preprocessor keyword after the #
+    for (auto& token : preprocessorTokens) {
+      if (str->size() > pos + token.length() && (str->substr(pos, token.length()).compare(token) == 0)) {
+        addSegment(startSharp, 1 + token.length(), Keyword);
+        pos += token.length();
+        break;
+      }
+    }
+  }
+
 void CPPLexer::lineCommentStatement() {
   // A statement spans until a newline is found (or EOF)
 
@@ -558,6 +583,11 @@ void CPPLexer::globalScope() {
 
     if (str->at(pos) == '#' && str->substr(pos + 1, 6).compare("define") == 0) { // #define
       defineStatement();
+      continue;
+    }
+
+    if (str->at(pos) == '#')  { // Non-define preprocessor statement
+      nondefinePreprocessorStatement();
       continue;
     }
 
