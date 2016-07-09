@@ -123,16 +123,24 @@ void VMainWindow::selectedTabChangedSlot(int oldId, int newId) {
 
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
   qDebug() << "Tab was requested to close: " << tabId;
-  m_tabsBar->deleteTab(tabId);
-  auto it = m_tabDocumentMap.find(tabId);
-  m_tabDocumentMap.erase(it);
+
+  m_tabsBar->deleteTab(tabId); // Start tabs bar deletion process and new candidate selection process
+
+  {
+    // Delete document and tab id
+    auto it = m_tabDocumentMap.find(tabId);
+    m_tabDocumentMap.erase(it);
+
+    // Also delete the VScrollBar position history (if any)
+    auto itv = m_tabDocumentVScrollPos.find(tabId);
+    if (itv != m_tabDocumentVScrollPos.end())
+      m_tabDocumentVScrollPos.erase(itv);
+  }
+
+  // If we don't have any other document loaded, unload the viewport completely and
+  // halt the rendering thread
   if(m_tabDocumentMap.empty())
-    m_customCodeEdit->unloadDocument();
-  // if (tabId == currentlySelected) {
-  //  m_customCodeEdit->setText("");
-  //      currentlySelected = m_tabsBar->getSelectedTabId();
-  //    }
-  //    contents.erase(tabId);
+    m_customCodeEdit->unloadDocument();  
 }
 
 VMainWindow::~VMainWindow() {
