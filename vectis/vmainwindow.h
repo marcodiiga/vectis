@@ -34,6 +34,12 @@ public:
     bool shotSet;
     tabTestFilter ttf; // DEBUG
 
+    void dragEnterEvent(QDragEnterEvent *event);
+    void dropEvent(QDropEvent *event);
+
+    // Loads a new document from a file
+    void loadDocumentFromFile(QString path, bool animation = false);
+
 private slots:
     void selectedTabChangedSlot(int oldId, int newId);
     void tabWasRequestedToCloseSlot(int tabId);

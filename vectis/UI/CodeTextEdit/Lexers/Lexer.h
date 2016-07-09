@@ -3,11 +3,20 @@
 
 #include <QString>
 #include <vector>
+#include <unordered_map>
+#include <string>
 
 // A list of supported lexers (this might be expanded in the future)
 enum LexerType {
   CPPLexerType
 };
+
+// A lexer might support multiple kind of syntax highlights
+enum SyntaxHighlight { NONE, CPP };
+
+// This function helps getting the right Syntax Highlighting from a common file extension.
+// Returns NONE if no syntax highlight scheme could be associated to this extension.
+SyntaxHighlight getSuggestedSyntaxHighlightFromExtension(QString extension);
 
 // A list of styles for the segments found by the lexer
 enum Style {

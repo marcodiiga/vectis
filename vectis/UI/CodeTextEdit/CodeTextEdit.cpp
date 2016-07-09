@@ -26,8 +26,10 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   m_verticalScrollBar = std::make_unique<ScrollBar>( this );
   this->setVerticalScrollBar( m_verticalScrollBar.get() );
   this->setVerticalScrollBarPolicy( Qt::ScrollBarAlwaysOn );
-  this->verticalScrollBar()->setSingleStep(5);
-  this->verticalScrollBar()->setPageStep(50);
+
+  // Default values for mouse wheel and pgUp/Down
+  this->verticalScrollBar()->setSingleStep(2);
+  this->verticalScrollBar()->setPageStep(65);
 
   // Set a font to use in this control
   // Consolas is installed by default on every Windows system, but not Linux. On Linux the
@@ -58,15 +60,18 @@ void CodeTextEdit::unloadDocument() {
   m_documentMutex.lock();
   m_document = nullptr;
   m_documentPixmap.release();
-  m_renderingThread.release();
+  // WARNING: the rendering thread should NEVER be stopped while the CodeTextEdit control is running
+  // [NO] m_renderingThread.release();
   m_documentMutex.unlock();
   emit documentSizeChanged( QSizeF(), fontMetrics().height(), 0 );
   repaint();
 }
 
 void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
+
   if (m_renderingThread->isRunning() == true)
     m_renderingThread->wait(); // Wait for all drawing operations to finish
+
 
   m_documentMutex.lock();
   m_document = doc;
@@ -318,6 +323,15 @@ void CodeTextEdit::verticalSliderValueChanged (int value) {
 
 void CodeTextEdit::documentSizeChangedFromThread(const QSizeF &newSize, const qreal lineHeight) {
   emit documentSizeChanged( newSize, lineHeight, m_document->m_storeSliderPos ); // Forward the signal to our QScrollBar
+
+//  // Since the thread updated the document size entirely, we're not able to adjust the scroll rate (mouse wheel and pgUp/Down)
+//  // to better fit the number of lines of the document
+
+//  // A document of 100 lines should be scrolled by 3 lines per scroll
+//  m_document->m_numberOfEditorLines
+//  this->verticalScrollBar()->setSingleStep(5);
+//  this->verticalScrollBar()->setPageStep(50);
+
   this->repaint();
 }
 

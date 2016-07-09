@@ -43,18 +43,10 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  int id = m_tabsBar->insertTab("SimpleFileWithALongNameForAGreaterJustice.cpp", false);
-  auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(*m_customCodeEdit)));
-  it.first->second->loadFromFile( "../vectis/TestData/SimpleFile.cpp" );
-  it.first->second->applySyntaxHighlight( CPP );
-  m_customCodeEdit->loadDocument( it.first->second.get() );
+  loadDocumentFromFile("../vectis/TestData/SimpleFile.cpp", false);
 
   // Load some other sample data
-  int id2 = m_tabsBar->insertTab("BasicBlock.cpp", false);
-  auto it2 = m_tabDocumentMap.insert(std::make_pair(id2, std::make_unique<Document>(*m_customCodeEdit)));
-  it2.first->second->loadFromFile( "../vectis/TestData/BasicBlock.cpp" );
-  it2.first->second->applySyntaxHighlight( CPP );
-  m_customCodeEdit->loadDocument( it2.first->second.get() );
+  loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
 
 
   // NOTICE: link connections AFTER all initial documents have been created
@@ -63,6 +55,9 @@ VMainWindow::VMainWindow(QWidget *parent) :
           this, SLOT(selectedTabChangedSlot(int, int)));
   connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
           this, SLOT(tabWasRequestedToCloseSlot(int)));
+
+  // Mark window as accepting drag'n'drops
+  setAcceptDrops(true);
 
 }
 
@@ -87,14 +82,51 @@ bool tabTestFilter::eventFilter ( QObject *obj, QEvent *event ) { // DEBUG EVENT
   return QObject::eventFilter( obj, event );
 }
 
-void VMainWindow::paintEvent(QPaintEvent *)
-{
+void VMainWindow::paintEvent (QPaintEvent *) {
 }
 
 
-void VMainWindow::selectedTabChangedSlot(int oldId, int newId) {
+// Starts and continues a drag and drop event only if it has uri form
+void VMainWindow::dragEnterEvent (QDragEnterEvent *event) {
+  if (event->mimeData()->hasFormat("text/uri-list"))
+    event->acceptProposedAction();
+}
+
+// Finalize a drop event of supported type
+void VMainWindow::dropEvent (QDropEvent *event) {
+  auto list = event->mimeData()->urls();
+
+  for(auto& url : list)
+    loadDocumentFromFile(url.toLocalFile(), true);
+
+  event->acceptProposedAction();
+}
+
+void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
+
+  QFileInfo fileInfo(path); // Strip filename from path
+  QString filename(fileInfo.fileName());
+
+  // Create document, tab and apply proper lexers
+  int id = m_tabsBar->insertTab(filename, animation);
+  auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(*m_customCodeEdit)));
+  auto& document = it.first->second;
+  document->loadFromFile( path );
+
+  // Try to detect a suitable syntax highlighting scheme from the file extension
+  QString extension(fileInfo.completeSuffix());
+  auto syntaxHighlighting = getSuggestedSyntaxHighlightFromExtension(extension);
+  document->applySyntaxHighlight( syntaxHighlighting );
+
+  // Finally load the newly created document in the viewport
+  m_customCodeEdit->loadDocument( document.get() );
+}
+
+void VMainWindow::selectedTabChangedSlot (int oldId, int newId) {
   qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
 
+  if (m_tabDocumentMap.find(newId) == m_tabDocumentMap.end())
+    return; // This tab hasn't an associated document. Do nothing.
 
   // Save current vertical scrollbar position (there is always a vscrollbar) before switching document
   if (oldId != -1)

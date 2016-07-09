@@ -65,6 +65,7 @@ int TabsBar::insertTab(const QString text, bool animation) {
       m_YInterpolators[newTabIndex]->start();
     }
 
+    // Select the new inserted tab
     auto oldTabIdIndex = (m_selectedTabIndex != -1) ? m_tabs[m_selectedTabIndex]->getTabId() : -1;
     m_selectedTabIndex = newTabIndex; // Make it the new selected one
     auto newTabIdIndex = m_tabs[m_selectedTabIndex]->getTabId();
@@ -461,10 +462,15 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
                     // before triggering a tab deletion
                     // deleteTab(m_tabs[i]->getTabId());
                     emit tabWasRequestedToClose (m_tabs[i]->getTabId());
-                } else { // New selection
+                } else {
+                    // New selection
                     auto oldTabIdIndex = (m_selectedTabIndex != -1) ? m_tabs[m_selectedTabIndex]->getTabId() : -1;
                     m_selectedTabIndex = i; // New selection
                     auto newTabIdIndex = m_tabs[m_selectedTabIndex]->getTabId();
+
+                    if (oldTabIdIndex == newTabIdIndex)
+                      return; // Tab is already selected
+
                     emitSelectionHasChanged (oldTabIdIndex, newTabIdIndex); // Signal that the selection has changed
                     repaint();                    
                 }

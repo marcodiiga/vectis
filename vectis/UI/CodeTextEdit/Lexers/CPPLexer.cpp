@@ -251,6 +251,9 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
     } else if (str->at(pos) == '}') {
       pos++;
 
+      if (m_scopesStack.empty())
+        return; // Probably malformed scope
+
       if (m_classKeywordActiveOnScope == m_scopesStack.top())
         m_classKeywordActiveOnScope = -2; // Exited a class scope
 
@@ -544,7 +547,7 @@ void CPPLexer::multilineComment() {
   pos += 2; // Add the '/*' characters
 
   // Ignore everything until a */ sequence
-  while (str->at(pos) != '*' && str->at(pos+1) != '/')
+  while (!(str->at(pos) == '*' && str->at(pos+1) == '/'))
     pos++;
 
   // Add '*/'

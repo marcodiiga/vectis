@@ -37,8 +37,6 @@ struct PhysicalLine {
   std::vector<EditorLine> m_editorLines;
 };
 
-enum SyntaxHighlight { NONE, CPP };
-
 // This class represents document loaded from the CodeTextEdit control.
 // A text document is treated as a grid of rectangles (the monospaced characters)
 // and a text 'physical' line might include one or more editor lines due to wrap
