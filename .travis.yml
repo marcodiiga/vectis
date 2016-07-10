@@ -1,0 +1,30 @@
+language: cpp
+sudo: required
+dist: trusty
+
+addons:
+  apt:
+    packages:
+      - g++-6
+    sources: &sources
+      - ubuntu-toolchain-r-test
+
+matrix:
+  include:
+    - os: linux
+      env: COMPILER=g++-6
+
+
+before_install:
+  - sudo add-apt-repository --yes ppa:beineri/opt-qt57-trusty
+  - sudo apt-get update -qq
+
+install:
+  # Packages from https://launchpad.net/~beineri/+archive/ubuntu/opt-qt57-trusty
+  - sudo apt-get -y install qt57tools qt57base qt57multimedia qt57declarative qt57creator
+
+script:
+  - cd vectis && source /opt/qt57/bin/qt57-env.sh
+  # Important: test data should NOT be compiled, therefore use -nopwd
+  - /opt/qt57/bin/qmake vectis.pro
+  - make CXX='g++-6' -j7

@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QScrollArea>
 #include <QLayout>
+#include <memory>
 
 #include <QDebug>
 
