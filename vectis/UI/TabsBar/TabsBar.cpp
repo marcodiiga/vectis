@@ -5,10 +5,10 @@
 #include <QDebug>
 #include <QStyleOption>
 #include <QApplication>
+#include <cmath>
 
 TabsBar::TabsBar( QWidget *parent )
     : m_parent(parent),
-      m_draggingInProgress(false),
       m_selectedTabIndex(-1),
       m_mouseHoveringCloseBtnTabIndex(-1)
 {
@@ -99,7 +99,7 @@ void TabsBar::deleteTab(int id, bool animation) {
 
     // Updates all right interpolators to refer to the right position in the tabs vector and
     // updates all right tabs in the tabId2tabIndex map
-    for (int i=delTabIndex; i<tabsBar.m_tabs.size(); ++i) {
+    for (size_t i = delTabIndex; i < tabsBar.m_tabs.size(); ++i) {
       tabsBar.m_XInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_YInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_tabId2tabIndexMap[tabsBar.m_tabs[i]->getTabId()] = i;
@@ -115,7 +115,7 @@ void TabsBar::deleteTab(int id, bool animation) {
       else { // Find a selection substitute
         // Just leave the id as it was if there was a right tab (it will take our selection)
         // (in case m_selectedTabIndex < m_tabs.size()), otherwise grab the leftmost one
-        if (tabsBar.m_selectedTabIndex >= tabsBar.m_tabs.size())
+        if (size_t(tabsBar.m_selectedTabIndex) >= tabsBar.m_tabs.size())
           tabsBar.m_selectedTabIndex = static_cast<int>(tabsBar.m_tabs.size()) - 1;
       }
       if (tabsBar.m_selectedTabIndex != -1) { // Do not emit any new selection signal for "no more tabs"
@@ -244,16 +244,18 @@ TabsBar::TabPaths TabsBar::drawTabInsideRect(QPainter& p, const QRect& tabRect, 
 
     if (textRect.width() > 0 && textRect.height() > 0) { // It doesn't make sense to render a 0-size image
 
-      // Before drawing the text, an opacity mask is applied. This ensures a text longer than the tab itself
-      // has a nice fade-out effect before the X button
-      //
-      //   _________________
-      //  / Very long text X\
-      //    ^           ^ ^
-      //    |           | |
-      //    |           |  --- Completely faded
-      //    |            --- Starting to fade
-      //    Text not faded
+      /*
+         Before drawing the text, an opacity mask is applied. This ensures a text longer than the tab itself
+         has a nice fade-out effect before the X button
+
+           _________________
+          / Very long text X\
+            ^           ^ ^
+            |           | |
+            |           |  --- Completely faded
+            |            --- Starting to fade
+            Text not faded
+      */
       recalculateOpacityMask (textRect); // Recalculate the tab's text opacity mask in case width has changed
                                          // otherwise grab the cached one
 
@@ -330,7 +332,7 @@ void TabsBar::drawGrayHorizontalBar( QPainter& p , const QColor innerGrayCol ) {
 void TabsBar::paintEvent ( QPaintEvent* ) {
 
     Q_ASSERT( m_selectedTabIndex == -1 || // Nothing was selected or we're into a valid tab range
-              ( m_selectedTabIndex != -1 && m_selectedTabIndex < m_tabs.size() ) );
+              ( m_selectedTabIndex != -1 && size_t(m_selectedTabIndex) < m_tabs.size() ) );
 
     QStyleOption opt; // Allows background setting via styleSheet
     opt.init(this);
@@ -485,7 +487,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
 
     // Estimates the tab's region the mouse could be in. This greatly saves performances.
     // Warning: due to the TAB_INTERSECTION_DELTA this is not fully reliable when dealing with tab regions
-    int estimatedTabIndex = ceil((evt->pos().x() - TAB_INTERSECTION_DELTA) / (tabWidth - TAB_INTERSECTION_DELTA));
+    int estimatedTabIndex = std::ceil((evt->pos().x() - TAB_INTERSECTION_DELTA) / (tabWidth - TAB_INTERSECTION_DELTA));
 
     auto assignHoverAndRepaintIfNecessary = [this](int newHoverValue) { // A lambda to assign and repaint a hover index
         bool needToRepaint = false;
@@ -496,7 +498,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
             this->repaint();
     };
 
-    if (estimatedTabIndex < m_tabs.size()) {
+    if (size_t(estimatedTabIndex) < m_tabs.size()) {
         // Test for intersection with close button region
         if (m_tabs[estimatedTabIndex]->m_closeBtnRegion.contains(evt->pos()) == true) {
             // We're in the close button region, signal its selection color
@@ -537,7 +539,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
     if( abs(m_XTrackingDistance) > tabWidth / 2 ) {
         // Do a swap if there's at least one tab in that direction
         if( m_XTrackingDistance > 0 ) {
-            if( m_tabs.size()-1 > m_selectedTabIndex ) {
+            if( m_tabs.size() - 1 > size_t(m_selectedTabIndex) ) {
                 // Swap tab vector's content and update the new index
                 setUpdatesEnabled(false);   // Disable paint() events UNTIL all updates are finished & the 'dethroned' tab has its
                                             // movement interpolator set

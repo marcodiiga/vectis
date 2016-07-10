@@ -58,13 +58,15 @@ private:
     // Qt hasn't a reliable way to detect whether all widgets have reached their stable
     // dimension (i.e. all resize() have been triggered), thus we delay syntax highlighting
     // and other expensive operations until the last resize() has been triggered
-    bool m_firstDocumentRecalculate;    
+    bool m_firstDocumentRecalculate = true;
 
     std::vector<QString> m_plainTextLines;
     const CodeTextEdit& m_codeTextEdit;
 
     // Variables related to how the control renders lines
-    int m_characterWidthPixels;
+    int m_characterWidthPixels; // A document has an internal copy of the character width since this
+                                // might differ from the code editor (perhaps this document is cached
+                                // and it hasn't been rendered with the new char width yet)
     int m_wrapWidth;
     int m_numberOfEditorLines;
     int m_maximumCharactersLine; // According to wrapWidth

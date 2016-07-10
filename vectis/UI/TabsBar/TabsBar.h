@@ -137,7 +137,7 @@ private:
     std::map<int, int> m_tabId2tabIndexMap; // The tab_id->control_position_index map for the tabs
     std::set<int> m_tabIdHoles; // The non-contiguous tab ids (left by deleted tabs)
 
-    bool m_draggingInProgress;
+    bool m_draggingInProgress = false;
     QPoint m_dragStartPosition;
     int m_selectionStartIndex;
     int m_XTrackingDistance; // Distance from the beginning of the tracking for a tab, negative or positive

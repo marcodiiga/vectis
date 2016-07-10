@@ -37,11 +37,15 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   // replacement monospace font
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
-  m_monospaceFont.setPixelSize(14);
+  m_monospaceFont.setPixelSize(14);  
 #else
   m_monospaceFont.setFamily( "Monospace" );
+  m_monospaceFont.setPixelSize(14);
 #endif
+  m_monospaceFont.setFixedPitch( true );
   m_monospaceFont.setStyleHint( QFont::Monospace );
+  m_monospaceFont.setStyleStrategy( QFont::ForceIntegerMetrics ); // IMPORTANT! Otherwise sub-pixel hinting will
+                                                                  // screw all of our integer font metrics calculations
   setFont( m_monospaceFont );
 
   // Stores the width of a single character in pixels with the given font (cache this value for
@@ -75,6 +79,9 @@ void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
 
   m_documentMutex.lock();
   m_document = doc;
+
+  // Impose our character width on this document before rendering it
+  m_document->m_characterWidthPixels = this->m_characterWidthPixels;
 
   // Save the scrollbar position if we have one
   m_document->m_storeSliderPos = VScrollbarPos;
@@ -206,7 +213,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
         startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
 
         // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
-        if (nextDestination == -1 ||
+        if (nextDestination == size_t(-1) ||
             nextDestination > documentRelativePos + (el.m_characters.size() - lineRelativePos)) {
 
           // Multiple lines will have to be rendered, just render this till the end and continue
@@ -344,11 +351,12 @@ void RenderingThread::run() {
   while(getFrontElement() == true) {
     m_cte.m_documentMutex.lock();
     m_cte.m_document->setWrapWidth(m_currentElement.wrapWidth);
-    m_cte.m_documentMutex.unlock();
 
     m_cte.m_backgroundBufferPixmap = std::make_unique<QImage>(m_currentElement.bufferWidth,
                                                               m_currentElement.bufferHeight,
-                                                              QImage::Format_ARGB32_Premultiplied);    
+                                                              QImage::Format_ARGB32_Premultiplied);
+
+    m_cte.m_documentMutex.unlock();
 
     m_cte.renderDocumentOnPixmap();
 

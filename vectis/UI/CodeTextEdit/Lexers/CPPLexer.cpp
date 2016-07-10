@@ -415,7 +415,7 @@ void CPPLexer::defineStatement() {
   //
 
   size_t startSegment = pos;
-  while (str->at(pos) != '(' && str->at(pos) != ' ') {
+  while (str->at(pos) != '(' && str->at(pos) != ' ' && str->at(pos) != '\n') {
     pos++;
   }
   addSegment(startSegment, pos - startSegment, Identifier);
@@ -423,13 +423,12 @@ void CPPLexer::defineStatement() {
   // Regular style for all the rest. A macro, even multiline, ends when a newline not preceded
   // by \ is found
   startSegment = pos;
-  while (!(str->at(pos) != '\\' && str->at(pos+1) == '\n')) {
+  while (!(str->at(pos) == '\n' && str->at(pos - 1) != '\\')) {
     pos++;
   }
   addSegment(startSegment, pos - startSegment, Normal);
-  pos++; // Eat the last character
 
-  // Do not add the \n to the comment (it will be handled outside)
+  // Do not add the \n to the directive (it will be handled outside)
 }
 
 void CPPLexer::nondefinePreprocessorStatement() {

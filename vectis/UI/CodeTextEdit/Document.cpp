@@ -13,8 +13,7 @@
 Document::Document(const CodeTextEdit& codeTextEdit) :
   m_codeTextEdit(codeTextEdit),
   m_wrapWidth(-1),
-  m_needReLexing(false),
-  m_firstDocumentRecalculate(true)
+  m_needReLexing(false)
 {  
   //qDebug() << m_codeTextEdit.fontMetrics().maxWidth() << " " << m_codeTextEdit.getViewportWidth();
 }
