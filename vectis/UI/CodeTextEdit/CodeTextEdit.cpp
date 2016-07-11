@@ -192,6 +192,9 @@ void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
       ++(m_document->m_viewportCursorPos.x);
       ++(m_document->m_documentCursorPos.ch);
 
+      if (m_document->m_lexer)
+        m_document->m_needReLexing = true;
+
       m_document->recalculateDocumentLines();
 
       // Adjust the number of lines of the pixmap if no longer enough
