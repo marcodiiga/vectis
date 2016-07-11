@@ -196,9 +196,10 @@ void Document::recalculateDocumentLines () {
       QtConcurrent::blockingMappedReduced<std::vector<PhysicalLine>>(m_plainTextLines.begin(), m_plainTextLines.end(),
                                                                      mapFn, reduceFn, QtConcurrent::SequentialReduce );
 
+
   // Update the cursor position according to the new wrapping
-  // Invariant: m_documentCursorPos shouldn't change here
-  {
+  // Invariant: m_documentCursorPos.pl and m_documentCursorPos.ch shouldn't change here. The Els might change.
+  if(!m_plainTextLines.empty()) {
     int countPL = 0;
     int countEL = 0;
     for(auto& pl : m_physicalLines) {
@@ -215,7 +216,8 @@ void Document::recalculateDocumentLines () {
     int ELrelativeCH = 0; // Character position relative to the beginning of the EL
     int relativeEL = 0; // EL inside this PL till the cursor position
     for(int i = 0; i < m_physicalLines[countPL].m_editorLines.size(); ++i) {
-      if (m_documentCursorPos.ch >= countCH + m_physicalLines[countPL].m_editorLines[relativeEL].m_characters.size()) {
+      // >, because being equal (caret blinking at the end of the line) also works
+      if (m_documentCursorPos.ch > countCH + m_physicalLines[countPL].m_editorLines[relativeEL].m_characters.size()) {
         // Explore another EL inside this PL
         countCH += (int)m_physicalLines[countPL].m_editorLines[relativeEL].m_characters.size();
         ++relativeEL;
@@ -228,7 +230,9 @@ void Document::recalculateDocumentLines () {
     countEL += relativeEL;
 
 
-
+    m_documentCursorPos.el = countEL;
+    m_documentCursorPos.relativeEl = relativeEL;
+    m_documentCursorPos.relativeCh = ELrelativeCH;
 
     // Set the correct position within the viewport
     m_viewportCursorPos.y = countEL;
@@ -344,17 +348,34 @@ void Document::setCursorPos(int x, int y) {
   // This code needs to find, given a position into the document, a valid point where to set
   // the caret at
 
+  if (m_plainTextLines.empty()) {
+
+    // Empty doc
+    m_viewportCursorPos.y = 0;
+    m_viewportCursorPos.x = 0;
+
+    m_documentCursorPos.pl = 0;
+    m_documentCursorPos.el = 0;
+    m_documentCursorPos.relativeEl = 0;
+    m_documentCursorPos.ch = 0;
+    m_documentCursorPos.relativeCh = 0;
+
+    return;
+  }
+
   // Find the editorLine this position corresponds to
   EditorLine *el = nullptr;
   int currentEL = 0;
   int currentPL = 0;
+  int relativeEL = 0;
   for(auto& pl : m_physicalLines) {
     int elCount = (int)pl.m_editorLines.size();
     if (y >= currentEL + elCount) // Still not in the requested EL
       currentEL += elCount;
     else {
       // We'll arrive at the requested EL in this PL
-      el = &pl.m_editorLines[y - currentEL];
+      relativeEL = y - currentEL;
+      el = &pl.m_editorLines[relativeEL];
       break;
     }
     ++currentPL;
@@ -369,7 +390,16 @@ void Document::setCursorPos(int x, int y) {
 
     m_documentCursorPos.pl = currentPL;
     m_documentCursorPos.el = currentEL;
-    m_documentCursorPos.ch = m_viewportCursorPos.x;
+    m_documentCursorPos.relativeEl = (int)(m_physicalLines.back().m_editorLines.size() - 1);
+
+    // Calculate the ch count from the beginning of the Pl
+    m_documentCursorPos.ch = std::accumulate( m_physicalLines.back().m_editorLines.begin(),
+                                              m_physicalLines.back().m_editorLines.end(), 0,
+        [](const int tot, EditorLine& edl) {
+          return tot + (int)edl.m_characters.size();
+    });
+
+    m_documentCursorPos.relativeCh = m_viewportCursorPos.x;
     return;
   }
 
@@ -380,13 +410,46 @@ void Document::setCursorPos(int x, int y) {
 
   m_documentCursorPos.pl = currentPL;
   m_documentCursorPos.el = currentEL;
-  m_documentCursorPos.ch = m_viewportCursorPos.x;
+  m_documentCursorPos.relativeEl = relativeEL;
+  m_documentCursorPos.ch = std::accumulate( m_physicalLines[currentPL].m_editorLines.begin(),
+                                            m_physicalLines[currentPL].m_editorLines.begin() + relativeEL, 0,
+      [](const int tot, EditorLine& edl) {
+        return tot + (int)edl.m_characters.size();
+  }) + m_viewportCursorPos.x;
+  m_documentCursorPos.relativeCh = m_viewportCursorPos.x;
+}
+
+void Document::typeAtCursor(QString keyStr) {
+
+  if (m_plainTextLines.empty()) {
+    // First digits, create a line we can write into
+    m_plainTextLines.resize(1);
+  }
+
+  // Add text at the current caret position
+  QString& line = m_plainTextLines[m_documentCursorPos.pl];
+
+  /*qDebug() << "Before:";
+  QString a = "";
+  for(auto& c : line)
+    a += c;
+  qDebug() << a;
+  qDebug() << "------------------- now ------------------";
+*/
+
+  line.insert(m_documentCursorPos.ch, keyStr);
+/*
+  a = "";
+  for(auto& c : line)
+    a += c;
+  qDebug() << a;
+*/
 }
 
 
 /*
  *
- * Document represents a grid for a text file
+ * The class Document represents a grid for a text file
  *
  * It provides a vector of PhysicalLine objects (the physical ones) that can include one or more multiple
  * EditorLine objects (the fake ones due to wrap). A PhysicalLine has two values: an int beginValue (i.e. the

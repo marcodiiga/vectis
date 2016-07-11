@@ -48,7 +48,7 @@ public:
 
     bool loadFromFile (QString file);
     void applySyntaxHighlight(SyntaxHighlight s);
-    void setWrapWidth(int width);    
+    void setWrapWidth(int width);
 
 private:
     friend class CodeTextEdit;
@@ -88,12 +88,16 @@ private:
     struct {
       int pl = 0;
       int el = 0;
-      int ch = 0;
+      int relativeEl = 0; // EditorLine number relative to the PhysicalLine
+      int ch = 0; // Relative to the start of the PhysicalLine
+      int relativeCh = 0; // Relative to the start of the EditorLine
     } m_documentCursorPos; // Latest known cursor position expressed in PhysicalLine - EditorLine - CharacterIndex
 
     // Asks the document to set the cursor elsewhere. The document will validate the position in the viewport
     // asked, possibly fix/correct the coordinates, and then set the m_viewportCursorPos variable
     void setCursorPos(int x, int y);
+
+    void typeAtCursor(QString keyStr);
 
     int m_storeSliderPos = -1; // This variable is used to store the slider position when this document
                                // is either switched off or put on hold

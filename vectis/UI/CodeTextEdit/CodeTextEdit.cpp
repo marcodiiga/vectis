@@ -71,7 +71,7 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
 
   // Configure the caret animation
   m_caretAlphaInterpolator.setStartValue(0);
-  m_caretAlphaInterpolator.setDuration(2000);
+  m_caretAlphaInterpolator.setDuration(700);
   m_caretAlphaInterpolator.setEndValue(255);
 
   m_renderingThread = std::make_unique<RenderingThread>(*this);
@@ -100,23 +100,24 @@ void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
 
 
   m_documentMutex.lock();
-  m_document = doc;
+    m_document = doc;
 
-  // Impose our character width and descent on this document before rendering it
-  m_document->m_characterWidthPixels = this->m_characterWidthPixels;
-  m_document->m_characterDescentPixels = this->m_characterDescentPixels;
+    // Impose our character width and descent on this document before rendering it
+    m_document->m_characterWidthPixels = this->m_characterWidthPixels;
+    m_document->m_characterDescentPixels = this->m_characterDescentPixels;
 
-  // Save the scrollbar position if we have one
-  m_document->m_storeSliderPos = VScrollbarPos;
+    // Save the scrollbar position if we have one
+    m_document->m_storeSliderPos = VScrollbarPos;
 
-  // Calculate the new document size
-  m_document->recalculateDocumentLines();
+    // Calculate the new document size
+    m_document->recalculateDocumentLines();
 
-  // Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
-  // since everything needs to be rendered, not just the viewport region
-  m_documentPixmap = std::make_unique<QImage>(viewport()->width(), m_document->m_numberOfEditorLines *
-                                              fontMetrics().height() + 20 /* Remember to compensate the offset */,
-                                              QImage::Format_ARGB32_Premultiplied);
+    // Set a new pixmap for rendering this document ~ caveat: this is NOT the viewport dimension
+    // since everything needs to be rendered, not just the viewport region. The number of editor lines
+    // will later be increased when needed
+    m_documentPixmap = std::make_unique<QImage>(viewport()->width(), std::min(100, m_document->m_numberOfEditorLines) *
+                                                fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */,
+                                                QImage::Format_ARGB32_Premultiplied);
   m_documentMutex.unlock();
 
   m_messageQueueMutex.lock();
@@ -166,6 +167,54 @@ void CodeTextEdit::mousePressEvent(QMouseEvent *evt) {
     m_caretAlphaInterpolator.setCurrentTime(m_caretAlphaInterpolator.duration());
     m_caretAlphaInterpolator.setDirection(QAbstractAnimation::Backward);
   }
+}
+
+void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
+  if (!m_document)
+    return;
+
+  if (m_renderingThread->isRunning() == true)
+    m_renderingThread->wait(); // Wait for all drawing operations to finish
+
+  QString keyStr = event->text(); // Translates input to a unicode QString
+  if (keyStr.isEmpty()) {
+    // Might be a meta key event
+    return;
+  }
+
+  m_messageQueueMutex.lock();
+    m_documentMutex.lock();
+
+      // Modify document data - safe from race conditions
+      m_document->typeAtCursor(keyStr);
+
+      // Advance the caret
+      ++(m_document->m_viewportCursorPos.x);
+      ++(m_document->m_documentCursorPos.ch);
+
+      m_document->recalculateDocumentLines();
+
+      // Adjust the number of lines of the pixmap if no longer enough
+      int Yneeded = m_document->m_numberOfEditorLines * fontMetrics().height() + BITMAP_OFFSET_Y;
+      if (m_documentPixmap->rect().height() < Yneeded)
+        // Expensive - reallocation of the internal pixmap
+        m_documentPixmap = std::make_unique<QImage>(viewport()->width(), (m_document->m_numberOfEditorLines * 2) *
+                                                      fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */,
+                                                      QImage::Format_ARGB32_Premultiplied);
+
+
+      // Post a resize message for the rendering thread (same size)
+      m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                             fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
+      // Save the current slider position in the document
+      m_document->m_storeSliderPos = m_sliderValue;
+    m_documentMutex.unlock();
+  m_messageQueueMutex.unlock();
+
+  if( m_renderingThread->isRunning() == false )
+      m_renderingThread->start();
+
+  this->update();
 }
 
 // As the name suggests: render the entire document on the internal stored pixmap
@@ -357,22 +406,39 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
     // Draw the cursor if in sight
     auto cursorPos = m_document->m_viewportCursorPos;
 
-    // Is the cursor in sight?
-    auto firstViewVisibleLine = m_sliderValue;
-    auto lastViewVisibleLine = firstViewVisibleLine + (myViewRect.height() / fontMetrics().height());
-    if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
+    auto drawCaretAt = [&](QPen pen, int bottomX, int bottomY, int topX, int topY) {
+      view.setPen(pen);
+      view.drawLine(bottomX, bottomY, topX, topY);
+    };
+
+    const int characterHeightPixels = fontMetrics().height();
+    const QPen caretPen(QColor(255, 255, 255, m_caretAlpha));
+
+    if (m_document->m_plainTextLines.empty()) {
+
+      // Document is empty, just draw a caret at 0;0
       if (m_caretAlphaInterpolator.state() != QAbstractAnimation::Running)
         m_caretAlphaInterpolator.start();
 
-      const QPen caretPen(QColor(255, 255, 255, m_caretAlpha));
-      view.setPen(caretPen);
+      drawCaretAt(caretPen, BITMAP_OFFSET_X, BITMAP_OFFSET_Y, BITMAP_OFFSET_X, BITMAP_OFFSET_Y - characterHeightPixels);
 
-      const int characterHeightPixels = fontMetrics().height();
-      auto viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * characterHeightPixels;
-      view.drawLine(cursorPos.x * m_characterWidthPixels + BITMAP_OFFSET_X, // Bottom point of the line
+    } else {
+
+      // Is the cursor in sight?
+      auto firstViewVisibleLine = m_sliderValue;
+      auto lastViewVisibleLine = firstViewVisibleLine + (myViewRect.height() / fontMetrics().height());
+      if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
+        if (m_caretAlphaInterpolator.state() != QAbstractAnimation::Running)
+          m_caretAlphaInterpolator.start();
+
+        auto viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * characterHeightPixels;
+
+        drawCaretAt(caretPen, cursorPos.x * m_characterWidthPixels + BITMAP_OFFSET_X, // Bottom point of the line
                     viewRelativeTopStart + BITMAP_OFFSET_Y,
                     cursorPos.x * m_characterWidthPixels + BITMAP_OFFSET_X,
                     viewRelativeTopStart + BITMAP_OFFSET_Y - characterHeightPixels /* Caret length */);
+      }
+
     }
   } else {
     // No document
@@ -383,7 +449,7 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
 
-  if (m_document == nullptr)
+  if (!m_document)
     return;
 
   m_messageQueueMutex.lock();

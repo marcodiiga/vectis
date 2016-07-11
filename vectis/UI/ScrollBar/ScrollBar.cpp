@@ -63,7 +63,7 @@ ScrollBar::ScrollBar (QAbstractScrollArea *parent ) :
     // Install PageDown/PageUp key eater for the parent control
     m_parent->installEventFilter( &m_pgKeyEater );
     // Move caret at the end of the scroll animation (pageStepEvent property helps not to move it for mouse scroll)
-    // connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );
+    // connect( &m_scrollAnim, SIGNAL(finished()), this, SLOT(moveParentCaret()) );    
 
     // Connect the parent "refresh view" slot with the slider's changes
     connect( this, SIGNAL(sliderValueChanged(int)), m_parent, SLOT(verticalSliderValueChanged(int)) );
@@ -209,7 +209,7 @@ void ScrollBar::documentSizeChanged(const QSizeF& newSize, const qreal lineHeigh
     // Also update the maximum allowed to let the last line to be scrolled till the beginning of the view
     setMaximum( m_internalLineCount - 1 );
     // Clamp and update slider position
-    setValue(std::min(verticalSliderPos, maximum()));
+    setValue(std::min(std::max(verticalSliderPos, 0), maximum()));
     // qDebug() << "m_textLineHeight "  << m_textLineHeight << " m_maxNumLines " << m_maxViewVisibleLines << " m_internalLineCount "
     //  << m_internalLineCount;
 }

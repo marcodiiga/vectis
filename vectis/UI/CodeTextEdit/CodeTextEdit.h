@@ -69,7 +69,8 @@ public:
     static constexpr const int BITMAP_OFFSET_X = 5;
     static constexpr const int BITMAP_OFFSET_Y = 20;
 
-    void mousePressEvent( QMouseEvent* evt );
+    void mousePressEvent ( QMouseEvent* evt );
+    void keyPressEvent ( QKeyEvent *event );
 
 private:
     friend class RenderingThread;
@@ -89,9 +90,9 @@ private:
     // document
     void resizeEvent(QResizeEvent *evt);
 
-    int m_sliderValue; // The slider value - gets updated by verticalSliderValueChanged.
-                       // It is the Y offset into the document expressed in the line number
-                       // we're currently at
+    int m_sliderValue = 0; // The slider value - gets updated by verticalSliderValueChanged.
+                           // It is the Y offset into the document expressed in the line number
+                           // we're currently at
 
     QFont m_monospaceFont;
     int m_characterWidthPixels = 0;

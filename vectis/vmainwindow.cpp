@@ -47,8 +47,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
   loadDocumentFromFile("../vectis/TestData/SimpleFile.cpp", false);
 
   // Load some other sample data
-  loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
-  loadDocumentFromFile("../vectis/TestData/SimpleFile.cpp", false);
+  //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
+  //loadDocumentFromFile("../vectis/TestData/SimpleFile.cpp", false);
 
 
   // NOTICE: link connections AFTER all initial documents have been created
