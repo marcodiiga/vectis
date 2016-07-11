@@ -99,7 +99,7 @@ void TabsBar::deleteTab(int id, bool animation) {
 
     // Updates all right interpolators to refer to the right position in the tabs vector and
     // updates all right tabs in the tabId2tabIndex map
-    for (size_t i = delTabIndex; i < tabsBar.m_tabs.size(); ++i) {
+    for (int i = delTabIndex; i < tabsBar.m_tabs.size(); ++i) {
       tabsBar.m_XInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_YInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_tabId2tabIndexMap[tabsBar.m_tabs[i]->getTabId()] = i;
@@ -532,7 +532,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
     //qDebug() << "mouseMoveEvent is dragging, m_XTrackingDistance(" << m_XTrackingDistance << "), tabWidth(" << tabWidth << "),"
     //        << "m_dragStartPosition.x(" << m_dragStartPosition.x() << ")";
 
-    // If we reached another tab's rect, "grab" its index. In Chrome more or less works like this: if there's a tab
+    // If we reached another tab's rect, "grab" its index. In all common tab bars more or less works like this: if there's a tab
     // in the direction which we're moving towards and we reached more than half our width: move it. If we continue another
     // half our width nothing happens. And then everything starts again.
     // Therefore tabWidth / 2 is the criterion to keep in mind
@@ -583,11 +583,13 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
                 setUpdatesEnabled(true);
             }
         } else {
-            if( m_selectedTabIndex > 0 )
+            if( m_selectedTabIndex > 0 /* 0 would not work */ ) {
                 // Swap the contents of the tab vector and update the new index
                 setUpdatesEnabled(false);   // Disable paint() events UNTIL all updates are finished & the 'dethroned' tab has its
                                             // movement interpolator set
+
                 //qDebug() << "Swap current tab (index: " << m_selectedTabIndex << ") with tab index: " << m_selectedTabIndex-1;
+
                 m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex]->getTabId()] = m_selectedTabIndex-1;
                 m_tabId2tabIndexMap[m_tabs[m_selectedTabIndex-1]->getTabId()] = m_selectedTabIndex;
                 std::swap(m_tabs[m_selectedTabIndex], m_tabs[m_selectedTabIndex-1]);
@@ -606,6 +608,7 @@ void TabsBar::mouseMoveEvent( QMouseEvent *evt ) {
                 m_XInterpolators[m_selectedTabIndex+1]->setEndValue(0);
                 m_XInterpolators[m_selectedTabIndex+1]->start();
                 setUpdatesEnabled(true);
+            }
         }
     }
 
