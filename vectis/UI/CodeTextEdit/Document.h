@@ -67,6 +67,8 @@ private:
     int m_characterWidthPixels; // A document has an internal copy of the character width since this
                                 // might differ from the code editor (perhaps this document is cached
                                 // and it hasn't been rendered with the new char width yet)
+    int m_characterDescentPixels; // Ditto
+
     int m_wrapWidth;
     int m_numberOfEditorLines;
     int m_maximumCharactersLine; // According to wrapWidth
@@ -74,13 +76,24 @@ private:
     std::unique_ptr<LexerBase> m_lexer;
     bool m_needReLexing; // Whether the document needs re-lexing
     std::vector<PhysicalLine> m_physicalLines;
-    StyleDatabase m_styleDb;
+    StyleDatabase m_styleDb; // Style database. Contains any style segment from a successful lexing
 
     // Variable document-specific
     struct {
       int x = 0;
       int y = 0;
-    } m_cursorPos; // Latest known cursor position
+    } m_viewportCursorPos; // Latest known cursor position. This is the cursor position INSIDE the viewport
+                           // and gets adjusted by the document itself when resizing/wrapping
+
+    struct {
+      int pl = 0;
+      int el = 0;
+      int ch = 0;
+    } m_documentCursorPos; // Latest known cursor position expressed in PhysicalLine - EditorLine - CharacterIndex
+
+    // Asks the document to set the cursor elsewhere. The document will validate the position in the viewport
+    // asked, possibly fix/correct the coordinates, and then set the m_viewportCursorPos variable
+    void setCursorPos(int x, int y);
 
     int m_storeSliderPos = -1; // This variable is used to store the slider position when this document
                                // is either switched off or put on hold

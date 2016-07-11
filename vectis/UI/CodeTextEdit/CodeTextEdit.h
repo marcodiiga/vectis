@@ -9,6 +9,8 @@
 
 class CodeTextEdit;
 
+// A message structure that gets passed to the rendering thread and put in a queue.
+// Contains information needed to resize/rewrap the document displayed
 struct ResizeParameters {
   ResizeParameters(int ww, int bw, int bh) : wrapWidth(ww),
     bufferWidth(bw), bufferHeight(bh) {}
@@ -18,6 +20,7 @@ struct ResizeParameters {
   int bufferHeight;
 };
 
+// Main rendering thread (should never be halted while CodeTextEdit is active)
 class RenderingThread : public QThread {
   Q_OBJECT
 public:
@@ -30,6 +33,23 @@ private:
 signals:
   void renderingReady();
   void documentSizeChangedFromThread( const QSizeF& newSize, const qreal lineHeight );
+};
+
+// This class implements a neverending interpolation for the caret blinking.
+// It would have probably made more sense to implement this as an inner class but the
+// MOC can't handle it.
+class CaretBlinkingInterpolation : public QVariantAnimation {
+    Q_OBJECT
+
+    CaretBlinkingInterpolation (CodeTextEdit& parent);
+
+    friend class CodeTextEdit;
+    void updateCurrentValue(const QVariant &value) override;
+
+    CodeTextEdit& m_parent;
+
+private slots:
+    void finished();
 };
 
 
@@ -45,8 +65,15 @@ public:
     int getViewportWidth() const;
     int getCharacterWidthPixels() const;
 
+    // Left-top padding used when rendering documents
+    static constexpr const int BITMAP_OFFSET_X = 5;
+    static constexpr const int BITMAP_OFFSET_Y = 20;
+
+    void mousePressEvent( QMouseEvent* evt );
+
 private:
     friend class RenderingThread;
+    friend class CaretBlinkingInterpolation;
     friend class VMainWindow; // Needs access to manipulate document and scrollbar positions
 
     void paintEvent(QPaintEvent *);
@@ -62,12 +89,19 @@ private:
     // document
     void resizeEvent(QResizeEvent *evt);
 
-    int m_sliderValue; // The slider value - gets updated by verticalSliderValueChanged
+    int m_sliderValue; // The slider value - gets updated by verticalSliderValueChanged.
+                       // It is the Y offset into the document expressed in the line number
+                       // we're currently at
 
     QFont m_monospaceFont;
-    int m_characterWidthPixels;
-    Document *m_document;
-    std::unique_ptr<ScrollBar>    m_verticalScrollBar;
+    int m_characterWidthPixels = 0;
+    int m_characterDescentPixels = 0;
+    Document *m_document = nullptr;
+
+    int m_caretAlpha = 0; // Alpha value of the caret (for animation/blinking purposes)
+    CaretBlinkingInterpolation m_caretAlphaInterpolator;
+
+    std::unique_ptr<ScrollBar> m_verticalScrollBar;
 
 private slots:
     void verticalSliderValueChanged( int value );

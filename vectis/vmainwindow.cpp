@@ -170,8 +170,8 @@ void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
       m_tabDocumentVScrollPos.erase(itv);
   }
 
-  // If we don't have any other document loaded, unload the viewport completely and
-  // halt the rendering thread
+  // If we don't have any other document loaded, unload the viewport completely (but do not halt the
+  // rendering thread)
   if(m_tabDocumentMap.empty())
     m_customCodeEdit->unloadDocument();  
 }

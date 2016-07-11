@@ -7,7 +7,7 @@
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
   QAbstractScrollArea(parent),
-  m_document(nullptr)
+  m_caretAlphaInterpolator(*this)
 {
 
   Q_ASSERT(parent);
@@ -51,6 +51,28 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   // Stores the width of a single character in pixels with the given font (cache this value for
   // every document to use it)
   m_characterWidthPixels = fontMetrics().width('A');
+  /*
+   * Here is how the font metrics work
+   *
+   * ----------------------------------------- Top
+   * _________________________________ Ascent
+   *               C
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Baseline
+   * _________________________________ Descent
+   *
+   * ----------------------------------------- Bottom
+   * (leading)
+   *
+   * Notice that when drawText() is called with a position, that indicates the baseline
+   * of a character, therefore we're also subtracting the descent() before rendering
+   *
+   */
+  m_characterDescentPixels = fontMetrics().descent();
+
+  // Configure the caret animation
+  m_caretAlphaInterpolator.setStartValue(0);
+  m_caretAlphaInterpolator.setDuration(2000);
+  m_caretAlphaInterpolator.setEndValue(255);
 
   m_renderingThread = std::make_unique<RenderingThread>(*this);
   connect(m_renderingThread.get(), SIGNAL(documentSizeChangedFromThread(const QSizeF&, const qreal)),
@@ -80,8 +102,9 @@ void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
   m_documentMutex.lock();
   m_document = doc;
 
-  // Impose our character width on this document before rendering it
+  // Impose our character width and descent on this document before rendering it
   m_document->m_characterWidthPixels = this->m_characterWidthPixels;
+  m_document->m_characterDescentPixels = this->m_characterDescentPixels;
 
   // Save the scrollbar position if we have one
   m_document->m_storeSliderPos = VScrollbarPos;
@@ -122,6 +145,27 @@ int CodeTextEdit::getViewportWidth() const {
 
 int CodeTextEdit::getCharacterWidthPixels() const {
   return this->m_characterWidthPixels;
+}
+
+// A click in the viewport area usually moves the caret around if there's a document loaded
+void CodeTextEdit::mousePressEvent(QMouseEvent *evt) {
+  if (!m_document)
+    return;
+
+  if ( evt->button() == Qt::LeftButton ) {
+    // Find the cell where the click was performed (x;y)
+    int y = m_sliderValue + evt->pos().y() / fontMetrics().height();
+    int x = (evt->pos().x() - BITMAP_OFFSET_X) / m_characterWidthPixels;
+    qDebug() << "Click in document detected: (" << x << ";" << y << ")";
+
+    m_documentMutex.lock();
+      m_document->setCursorPos(x, y);
+    m_documentMutex.unlock();
+
+    m_caretAlphaInterpolator.stop();
+    m_caretAlphaInterpolator.setCurrentTime(m_caretAlphaInterpolator.duration());
+    m_caretAlphaInterpolator.setDirection(QAbstractAnimation::Backward);
+  }
 }
 
 // As the name suggests: render the entire document on the internal stored pixmap
@@ -169,7 +213,9 @@ void CodeTextEdit::renderDocumentOnPixmap() {
     };
   };
 
-  QPointF startpoint(5, 20);
+  // Notice the usage of the character descent: we're making sure that every call to drawText()
+  // specifies the bottom-left point of a character
+  QPointF startpoint(BITMAP_OFFSET_X, BITMAP_OFFSET_Y - m_characterDescentPixels);
   size_t documentRelativePos = 0;
   size_t lineRelativePos = 0;
   auto styleIt = m_document->m_styleDb.styleSegment.begin();
@@ -210,7 +256,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
       ++editorLineIndex;
 
       do {
-        startpoint.setX( 5 + lineRelativePos * m_characterWidthPixels );
+        startpoint.setX( BITMAP_OFFSET_X + lineRelativePos * m_characterWidthPixels );
 
         // If we don't have a destination OR we can't reach it within our line, just draw the entire line and continue
         if (nextDestination == size_t(-1) ||
@@ -269,7 +315,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
       } while(true);
 
       // Move the rendering cursor (carriage-return)
-      startpoint.setY(startpoint.y() + fontMetrics().height());
+      startpoint.setY (startpoint.y() + fontMetrics().height());
     }
   }
 
@@ -292,6 +338,10 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
   view.setBrush(backgroundBrush);
   view.fillRect(rect(), backgroundBrush);
 
+  //////////////////////////////////////////////////////////////////////
+  // Draw the document
+  //////////////////////////////////////////////////////////////////////
+
   m_documentMutex.lock();
   if (m_document != nullptr) {
     // Apply the offset and draw the pixmap on the viewport
@@ -299,11 +349,36 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
     QRectF pixmapRequestedRect(m_documentPixmap->rect().x(), m_documentPixmap->rect().y() + scrollOffset,
                                m_documentPixmap->rect().width(), viewport()->height());
     QRectF myViewRect = viewport()->rect();
-    myViewRect.setWidth(pixmapRequestedRect.width());
+    myViewRect.setWidth (pixmapRequestedRect.width());
 
     view.drawImage(myViewRect, *m_documentPixmap, pixmapRequestedRect);
     //view.drawPixmap (myViewRect, *m_documentPixmap, pixmapRequestedRect);
+
+    // Draw the cursor if in sight
+    auto cursorPos = m_document->m_viewportCursorPos;
+
+    // Is the cursor in sight?
+    auto firstViewVisibleLine = m_sliderValue;
+    auto lastViewVisibleLine = firstViewVisibleLine + (myViewRect.height() / fontMetrics().height());
+    if (cursorPos.y >= firstViewVisibleLine - 1 && cursorPos.y < lastViewVisibleLine + 1) {
+      if (m_caretAlphaInterpolator.state() != QAbstractAnimation::Running)
+        m_caretAlphaInterpolator.start();
+
+      const QPen caretPen(QColor(255, 255, 255, m_caretAlpha));
+      view.setPen(caretPen);
+
+      const int characterHeightPixels = fontMetrics().height();
+      auto viewRelativeTopStart = (cursorPos.y - firstViewVisibleLine /* Line view-relative where the caret is at */) * characterHeightPixels;
+      view.drawLine(cursorPos.x * m_characterWidthPixels + BITMAP_OFFSET_X, // Bottom point of the line
+                    viewRelativeTopStart + BITMAP_OFFSET_Y,
+                    cursorPos.x * m_characterWidthPixels + BITMAP_OFFSET_X,
+                    viewRelativeTopStart + BITMAP_OFFSET_Y - characterHeightPixels /* Caret length */);
+    }
+  } else {
+    // No document
+    m_caretAlphaInterpolator.stop();
   }
+
   m_documentMutex.unlock();
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
@@ -312,10 +387,13 @@ void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
     return;
 
   m_messageQueueMutex.lock();
-  m_documentMutex.lock();
-  m_documentUpdateMessages.emplace_back( evt->size().width(), viewport()->width(), m_document->m_numberOfEditorLines *
-                                         fontMetrics().height() + 20 /* Remember to compensate the offset */ );
-  m_documentMutex.unlock();
+    m_documentMutex.lock();
+      // Post a resize message for the rendering thread
+      m_documentUpdateMessages.emplace_back( evt->size().width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                             fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
+      // Save the current slider position in the document
+      m_document->m_storeSliderPos = m_sliderValue;
+    m_documentMutex.unlock();
   m_messageQueueMutex.unlock();
 
   if( m_renderingThread->isRunning() == false )
@@ -382,4 +460,24 @@ bool RenderingThread::getFrontElement() {
   }
   m_cte.m_messageQueueMutex.unlock();
   return elementFound;
+}
+
+CaretBlinkingInterpolation::CaretBlinkingInterpolation(CodeTextEdit& parent) :
+  m_parent(parent)
+{
+  connect (this, SIGNAL(finished()), SLOT(finished()));
+  setLoopCount(1); // Run once, then reset it with a new direction
+}
+
+// Called at every variation of the interpolation value
+void CaretBlinkingInterpolation::updateCurrentValue(const QVariant& value) {
+  // Update the caret's state (notice that this might go forward or backward depending on Direction)
+  m_parent.m_caretAlpha = value.toInt();
+  m_parent.update(); // Do NOT call repaint() here since it might end in an infinite paint recursion
+}
+
+// Animation has finished, switch direction (from start to end or vice-versa)
+void CaretBlinkingInterpolation::finished() {
+  setDirection((direction() == QAbstractAnimation::Forward) ? QAbstractAnimation::Backward : QAbstractAnimation::Forward);
+  start();
 }

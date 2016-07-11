@@ -6,6 +6,7 @@
 #include <QRegExp>
 #include <QtConcurrent>
 #include <functional>
+#include <algorithm>
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -15,7 +16,10 @@ Document::Document(const CodeTextEdit& codeTextEdit) :
   m_wrapWidth(-1),
   m_needReLexing(false)
 {  
-  //qDebug() << m_codeTextEdit.fontMetrics().maxWidth() << " " << m_codeTextEdit.getViewportWidth();
+  // A document has always at least one physical line and an editorline
+  m_physicalLines.resize(1);
+  m_physicalLines.back().m_editorLines.emplace_back(QString());
+  setCursorPos(0, 0);
 }
 
 // The following function loads the contents of a text file into memory.
@@ -88,6 +92,8 @@ namespace {
 
 }
 
+// A complex multithreaded function which performs wrap-around calculations and, if necessary, triggers
+// a complete relexing of the document
 void Document::recalculateDocumentLines () {
 
   //QElapsedTimer timer;
@@ -104,6 +110,8 @@ void Document::recalculateDocumentLines () {
     m_lexer->lexInput(std::move(m_plainText.toStdString()), m_styleDb);
     m_needReLexing = false;
   }
+
+  // Store how many lines
 
   // Drop previous lines
   m_physicalLines.clear();
@@ -183,9 +191,50 @@ void Document::recalculateDocumentLines () {
 
   };
 
+  // >> Launch the workload <<
   m_physicalLines =
       QtConcurrent::blockingMappedReduced<std::vector<PhysicalLine>>(m_plainTextLines.begin(), m_plainTextLines.end(),
                                                                      mapFn, reduceFn, QtConcurrent::SequentialReduce );
+
+  // Update the cursor position according to the new wrapping
+  // Invariant: m_documentCursorPos shouldn't change here
+  {
+    int countPL = 0;
+    int countEL = 0;
+    for(auto& pl : m_physicalLines) {
+      if (m_documentCursorPos.pl == countPL)
+        break;
+      countEL += (int)pl.m_editorLines.size();
+      ++countPL;
+    }
+
+    Q_ASSERT (countPL < m_physicalLines.size()); // Should never be fired
+
+    // Find the EL where the character requested is now stored
+    int countCH = 0;
+    int ELrelativeCH = 0; // Character position relative to the beginning of the EL
+    int relativeEL = 0; // EL inside this PL till the cursor position
+    for(int i = 0; i < m_physicalLines[countPL].m_editorLines.size(); ++i) {
+      if (m_documentCursorPos.ch >= countCH + m_physicalLines[countPL].m_editorLines[relativeEL].m_characters.size()) {
+        // Explore another EL inside this PL
+        countCH += (int)m_physicalLines[countPL].m_editorLines[relativeEL].m_characters.size();
+        ++relativeEL;
+      } else {
+        // Found the EL where the cursor position was before the wrap
+        ELrelativeCH = m_documentCursorPos.ch - countCH;
+        break;
+      }
+    }
+    countEL += relativeEL;
+
+
+
+
+    // Set the correct position within the viewport
+    m_viewportCursorPos.y = countEL;
+    m_viewportCursorPos.x = ELrelativeCH;
+  }
+
 
 //qDebug() << "done";
 
@@ -289,6 +338,49 @@ void Document::recalculateDocumentLines () {
   // and the document structure is stored in memory
 
   //qDebug() << "Done recalculating document lines in " << timer.elapsed() << " milliseconds";
+}
+
+void Document::setCursorPos(int x, int y) {
+  // This code needs to find, given a position into the document, a valid point where to set
+  // the caret at
+
+  // Find the editorLine this position corresponds to
+  EditorLine *el = nullptr;
+  int currentEL = 0;
+  int currentPL = 0;
+  for(auto& pl : m_physicalLines) {
+    int elCount = (int)pl.m_editorLines.size();
+    if (y >= currentEL + elCount) // Still not in the requested EL
+      currentEL += elCount;
+    else {
+      // We'll arrive at the requested EL in this PL
+      el = &pl.m_editorLines[y - currentEL];
+      break;
+    }
+    ++currentPL;
+  }
+
+  if (!el) {
+    --currentPL; // Fix out-of-loop values
+    --currentEL;
+    // Cannot validate or out of the document, set it to the last possible position
+    m_viewportCursorPos.y = currentEL;
+    m_viewportCursorPos.x = (int)m_physicalLines.back().m_editorLines.back().m_characters.size();
+
+    m_documentCursorPos.pl = currentPL;
+    m_documentCursorPos.el = currentEL;
+    m_documentCursorPos.ch = m_viewportCursorPos.x;
+    return;
+  }
+
+  // We found a valid EL, y is fine
+  m_viewportCursorPos.y = y;
+  // Fix the X coordinate with this EL's length
+  m_viewportCursorPos.x = std::min((int)el->m_characters.size(), x);
+
+  m_documentCursorPos.pl = currentPL;
+  m_documentCursorPos.el = currentEL;
+  m_documentCursorPos.ch = m_viewportCursorPos.x;
 }
 
 

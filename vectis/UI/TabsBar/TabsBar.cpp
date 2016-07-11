@@ -647,7 +647,7 @@ SlideToPositionAnimation::SlideToPositionAnimation(TabsBar& parent, int associat
 
 // This method is called at every variation of the interpolation value, it must make sure that
 // each tab's offset is updated
-void SlideToPositionAnimation::updateCurrentValue(const QVariant &value) {
+void SlideToPositionAnimation::updateCurrentValue(const QVariant& value) {
 
     // Update the offset for the associated tab (either vertical or horizontal)
     if (m_isHorizontalOffset)
