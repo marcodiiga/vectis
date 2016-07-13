@@ -474,7 +474,38 @@ void Document::setCursorPos(int x, int y) {
   m_documentCursorPos.relativeCh = newXCoord;
 }
 
+void Document::typeNewlineAtCursor() {
+  if (m_plainTextLines.empty()) {
+    // First digits, create a line we can write into
+    m_plainTextLines.resize(1);
+  }
+
+  // Add newline at the current caret position
+  QString& line = m_plainTextLines[m_documentCursorPos.pl];
+  QString restOfLine = line.right(line.length() - m_documentCursorPos.ch);
+
+  // Remove the rest from the physical line
+  line.remove(m_documentCursorPos.ch, restOfLine.size());
+  line += '\n';
+
+  // Add another PL and stitch the rest of the split in there
+  m_plainTextLines.insert(m_plainTextLines.begin() + m_documentCursorPos.pl + 1, std::move(restOfLine));
+
+  // Advance the caret to the next PL
+  ++(m_viewportCursorPos.y);
+  m_viewportCursorPos.x = 0;
+  ++(m_documentCursorPos.pl);
+  ++(m_documentCursorPos.el);
+  m_documentCursorPos.relativeEl = 0; // Obviously if the line did fit with the current wrap, a split will create
+                                      // another line which fits the wrap
+  m_documentCursorPos.ch = 0;
+  m_documentCursorPos.relativeCh = 0;
+}
+
 void Document::typeAtCursor(QString keyStr) {
+
+  if (keyStr.isEmpty())
+    return; // Nothing to be done (unrecognized keystroke?)
 
   if (m_plainTextLines.empty()) {
     // First digits, create a line we can write into
@@ -484,21 +515,12 @@ void Document::typeAtCursor(QString keyStr) {
   // Add text at the current caret position
   QString& line = m_plainTextLines[m_documentCursorPos.pl];
 
-  /*qDebug() << "Before:";
-  QString a = "";
-  for(auto& c : line)
-    a += c;
-  qDebug() << a;
-  qDebug() << "------------------- now ------------------";
-*/
-
   line.insert(m_documentCursorPos.ch, keyStr);
-/*
-  a = "";
-  for(auto& c : line)
-    a += c;
-  qDebug() << a;
-*/
+
+  // Advance the caret since we inserted text
+  ++(m_viewportCursorPos.x);
+  ++(m_documentCursorPos.ch);
+  ++(m_documentCursorPos.relativeCh);
 }
 
 

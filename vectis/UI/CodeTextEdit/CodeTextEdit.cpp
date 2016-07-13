@@ -177,21 +177,18 @@ void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
   if (m_renderingThread->isRunning() == true)
     m_renderingThread->wait(); // Wait for all drawing operations to finish
 
-  QString keyStr = event->text(); // Translates input to a unicode QString
-  if (keyStr.isEmpty()) {
-    // Might be a meta key event
-    return;
-  }
 
-  m_messageQueueMutex.lock();
+  m_messageQueueMutex.lock(); // Keep this safe from race conditions
     m_documentMutex.lock();
 
-      // Modify document data - safe from race conditions
-      m_document->typeAtCursor(keyStr);
-
-      // Advance the caret
-      ++(m_document->m_viewportCursorPos.x);
-      ++(m_document->m_documentCursorPos.ch);
+      // Enter or numpad enter for \n
+      if( (event->key() == Qt::Key_Enter) || (event->key() == Qt::Key_Return) )
+        m_document->typeNewlineAtCursor();
+      else {
+        // Modify document data inserting text
+        QString keyStr = event->text(); // Translates input to a unicode QString for a key
+        m_document->typeAtCursor(keyStr);
+      }
 
       if (m_document->m_lexer)
         m_document->m_needReLexing = true;

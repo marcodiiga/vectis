@@ -86,8 +86,8 @@ private:
                            // and gets adjusted by the document itself when resizing/wrapping
 
     struct {
-      int pl = 0;
-      int el = 0;
+      int pl = 0; // Abs in the doc
+      int el = 0; // Abs in the doc
       int relativeEl = 0; // EditorLine number relative to the PhysicalLine
       int ch = 0; // Relative to the start of the PhysicalLine
       int relativeCh = 0; // Relative to the start of the EditorLine
@@ -97,6 +97,7 @@ private:
     // asked, possibly fix/correct the coordinates, and then set the m_viewportCursorPos variable
     void setCursorPos(int x, int y);
 
+    void typeNewlineAtCursor();
     void typeAtCursor(QString keyStr);
 
     int m_storeSliderPos = -1; // This variable is used to store the slider position when this document
