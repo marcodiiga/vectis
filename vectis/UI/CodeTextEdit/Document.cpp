@@ -47,6 +47,10 @@ bool Document::loadFromFile(QString file) {
   for(auto ch : str) {
     line += ch;
     if (ch == '\n') {
+
+      QRegExp tabs("\t");
+      line.replace(tabs, QString(4, 0x07)); // Use the 0x07 BELL ascii char as tabulation marker
+
       m_plainTextLines.push_back(std::move(line));
       line.clear();
     }
@@ -414,34 +418,49 @@ void Document::setCursorPos(int x, int y) {
   // We found a valid EL, y is fine
   m_viewportCursorPos.y = y;
 
-  // All viewport X calculations are to be performed not on the original EL.m_characters (characters of the EL),
-  // but on an expanse version with tabs modified into spaces
-  decltype(el->m_characters) tabExpandedVec;
-  for(auto ch : el->m_characters) {
-    if (ch == '\t')
-      tabExpandedVec.resize(tabExpandedVec.size(), '    ');
-     else
-      tabExpandedVec.push_back(ch);
+  // If the X coordinate is longer than the EL line itself, grab the minimum and drop the EOLs
+  auto& vec = el->m_characters;
+  int newXCoord = x;
+  int EOLs = 0;
+  if (vec.size() >= 1 && vec.back() == '\n') {
+    ++EOLs;
+    if (vec.size() >= 2 && vec[vec.size() - 2] == '\r')
+      ++EOLs;
   }
+  if (x >= vec.size() - EOLs)
+    newXCoord = (int)vec.size() - EOLs; // Put the caret before the EOLs if we clicked where the EL can't reach
+  else {
+    // Into the EL, mind the tab-adjustment if we're right into one
+    if (vec[x] == 0x07) {
+      // Find the first tab of the series
+      int first = x;
+      while(first >= 0 && vec[first] == 0x07)
+        --first;
+      ++first;
+      // Find the last tab of the series
+      int last = x;
+      while(last < vec.size() && vec[last] == 0x07)
+        ++last;
+      --last;
 
-  // Fix the X coordinate with this EL's length excluding end of line terminators found before x
-  int EOLinExpandedBeforeX = 0;
-  int size = std::min((int)tabExpandedVec.size(), x);
-  for(int i = size - 1; i >= 0; --i) {
-    if (vec[i] == '\n' || vec[i] == '\r')
-      ++EOLinExpandedBeforeX;
+      int index = x - first; // index into the sequence
+
+      // |_|_|_|_|  |_|_|_|_|
+      //  ^ ^ * *
+      //  | |
+      //  these indices / 4 have decimal part less than 0.5 therefore the caret
+      //  should be aligned to first + (int)(index/4)*4
+      //  Similar reasoning for the last two (*)
+      float res = index / 4.f;
+      if (res < .5f)
+        newXCoord = first + (int)(index / 4) * 4;
+      else
+        newXCoord = first + (int)(index / 4 + 1) * 4;
+    }
   }
-
-  // Count tabs before the requested x
-  // Align X coordinate if inside a tab area
-
-  // TODO: there is a better way to do this: just treat all tabs as 4 spaces
-  // and store the indices for each tab in a map for every editorline. This makes it easy to move the cursor around
-  // and avoids overly complicated calculations!
-
 
   // This is the position the user will see on the viewport grid
-  m_viewportCursorPos.x = size + (3 /* remaining to complete a tab */ * tabsInELBeforeX) - EOLinELBeforeX;
+  m_viewportCursorPos.x = newXCoord;
 
   // Now calculate the internal position in the document (tabs and newlines will mess this up)
   m_documentCursorPos.pl = currentPL;
@@ -451,8 +470,8 @@ void Document::setCursorPos(int x, int y) {
                                             m_physicalLines[currentPL].m_editorLines.begin() + relativeEL, 0,
                             [](const int tot, EditorLine& edl) {
                               return tot + (int)edl.m_characters.size();
-                        }) + m_viewportCursorPos.x - (3 /* remaining to complete a tab */ * tabsInELBeforeX);
-  m_documentCursorPos.relativeCh = m_viewportCursorPos.x - (3 /* remaining to complete a tab */ * tabsInELBeforeX);
+                        }) + newXCoord;
+  m_documentCursorPos.relativeCh = newXCoord;
 }
 
 void Document::typeAtCursor(QString keyStr) {

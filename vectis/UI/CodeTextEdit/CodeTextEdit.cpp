@@ -275,10 +275,11 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   auto styleEnd = m_document->m_styleDb.styleSegment.end();
   size_t nextDestination = -1;
 
-  // Transforms any tab into 4 newlines (by design)
-  auto transformTabsIntoNewlines = [](QString& str) {
-    QRegExp tabs("\t");
-    str.replace(tabs, "    ");
+  auto transformTabMarkersIntoSpaces = [](QString& str) {
+    for(auto& ch : str) {
+      if (ch == 0x07) // Tab marker
+        ch = ' ';
+    }
   };
 
   auto calculateNextDestination = [&]() {
@@ -339,10 +340,11 @@ void CodeTextEdit::renderDocumentOnPixmap() {
               ++skippedNewlineChars;
             }
 
-            charsRendered = ts.size(); // CAVEAT: do this BEFORE the tabs transformation to get the real char count!!
-            transformTabsIntoNewlines(ts);
+            transformTabMarkersIntoSpaces(ts);
 
-            painter.drawText(startpoint, ts);            
+            charsRendered = ts.size();
+
+            painter.drawText(startpoint, ts);
           }
 
           lineRelativePos = 0; // Next editor line will just start from the beginning
@@ -368,10 +370,11 @@ void CodeTextEdit::renderDocumentOnPixmap() {
               ++skippedNewlineChars;
             }
 
-            charsRendered = ts.size(); // CAVEAT: do this BEFORE the tabs transformation to get the real char count!!
-            transformTabsIntoNewlines(ts);
+            transformTabMarkersIntoSpaces(ts);
 
-            painter.drawText(startpoint, ts);            
+            charsRendered = ts.size();
+
+            painter.drawText(startpoint, ts);
           }
 
           bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
