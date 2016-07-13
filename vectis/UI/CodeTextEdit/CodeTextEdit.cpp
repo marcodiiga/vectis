@@ -1,6 +1,7 @@
 #include <UI/CodeTextEdit/CodeTextEdit.h>
 #include <QPainter>
 #include <QResizeEvent>
+#include <QRegExp>
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -274,6 +275,12 @@ void CodeTextEdit::renderDocumentOnPixmap() {
   auto styleEnd = m_document->m_styleDb.styleSegment.end();
   size_t nextDestination = -1;
 
+  // Transforms any tab into 4 newlines (by design)
+  auto transformTabsIntoNewlines = [](QString& str) {
+    QRegExp tabs("\t");
+    str.replace(tabs, "    ");
+  };
+
   auto calculateNextDestination = [&]() {
     // We can have 2 cases here:
     // 1) Our position hasn't still reached a style segment (apply regular style and continue)
@@ -301,7 +308,7 @@ void CodeTextEdit::renderDocumentOnPixmap() {
 
   // Implement the main rendering loop algorithm which renders characters segment by segment
   // on the viewport area
-  for(auto& pl : m_document->m_physicalLines) {
+  for (auto& pl : m_document->m_physicalLines) {
 
     size_t editorLineIndex = 0; // This helps tracking the last EditorLine of a PhysicalLine
     for(auto& el : pl.m_editorLines) {
@@ -317,15 +324,29 @@ void CodeTextEdit::renderDocumentOnPixmap() {
           // Multiple lines will have to be rendered, just render this till the end and continue
 
           int charsRendered = 0;
+          int skippedNewlineChars = 0;
           if (el.m_characters.size() > 0) { // Empty lines must be skipped
+
             QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(el.m_characters.size() - lineRelativePos));
-            painter.drawText(startpoint, ts);
-            charsRendered = ts.size();
+
+            // By design every line might end with a newline (guaranteed there's none or just one at the end)
+            if (ts.endsWith('\n')) {
+              ts.resize(ts.size() - 1);
+              ++skippedNewlineChars;
+            }
+            if (ts.endsWith('\r')) {
+              ts.resize(ts.size() - 1);
+              ++skippedNewlineChars;
+            }
+
+            charsRendered = ts.size(); // CAVEAT: do this BEFORE the tabs transformation to get the real char count!!
+            transformTabsIntoNewlines(ts);
+
+            painter.drawText(startpoint, ts);            
           }
 
           lineRelativePos = 0; // Next editor line will just start from the beginning
-          documentRelativePos += charsRendered + /* Plus a newline if a physical line ended (NOT an EditorLine) */
-              (editorLineIndex == pl.m_editorLines.size() ? 1 : 0);
+          documentRelativePos += charsRendered + skippedNewlineChars;
 
           break; // Go and fetch a new line for the next cycle
         } else {
@@ -333,29 +354,41 @@ void CodeTextEdit::renderDocumentOnPixmap() {
           // We can reach the goal within this line
 
           int charsRendered = 0;
+          int skippedNewlineChars = 0;
           if (el.m_characters.size() > 0) { // Empty lines must be skipped
             QString ts(el.m_characters.data() + lineRelativePos, static_cast<int>(nextDestination - documentRelativePos));
-            painter.drawText(startpoint, ts);
-            charsRendered = ts.size();
+
+            // By design every line might end with a newline (guaranteed there's none or just one at the end)
+            if (ts.endsWith('\n')) {
+              ts.resize(ts.size() - 1);
+              ++skippedNewlineChars;
+            }
+            if (ts.endsWith('\r')) {
+              ts.resize(ts.size() - 1);
+              ++skippedNewlineChars;
+            }
+
+            charsRendered = ts.size(); // CAVEAT: do this BEFORE the tabs transformation to get the real char count!!
+            transformTabsIntoNewlines(ts);
+
+            painter.drawText(startpoint, ts);            
           }
 
           bool goFetchNewLine = false; // If this goal also exhausted the current editor line, go fetch
                                        // another one
-          bool addNewLine = false; // If this was the last editor line, also add a newline because it
-                                   // corresponds to a new physical line starting
-          if(nextDestination - documentRelativePos + lineRelativePos == el.m_characters.size()) {
-            goFetchNewLine = true;
 
-            // Do not allow EditorLine to insert a '\n'. They're virtual lines
-            if (editorLineIndex == pl.m_editorLines.size())
-              addNewLine = true;
+          auto lineCharsCovered = nextDestination - documentRelativePos + lineRelativePos;
+          if(lineCharsCovered == el.m_characters.size() || // It doesn't matter if a goal got exhausted before or
+                                                           // including the newline characters
+             lineCharsCovered + skippedNewlineChars == el.m_characters.size())
+          {
+            goFetchNewLine = true;
 
             lineRelativePos = 0; // Next editor line will just start from the beginning
           } else
-            lineRelativePos += charsRendered;
+            lineRelativePos += charsRendered + skippedNewlineChars;
 
-          documentRelativePos += charsRendered + (addNewLine ? 1 : 0); // Just add a newline if we also reached this line's
-                                                                       // end AND a physical line ended, not an EditorLine
+          documentRelativePos += charsRendered + skippedNewlineChars;
 
           calculateNextDestination(); // Need a new goal
 

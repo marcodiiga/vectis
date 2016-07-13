@@ -7,6 +7,9 @@
 #include <QtConcurrent>
 #include <functional>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 #include <QDebug>
 #include <QElapsedTimer>
@@ -27,26 +30,33 @@ Document::Document(const CodeTextEdit& codeTextEdit) :
 // Returns true on success
 bool Document::loadFromFile(QString file) {
 
-  QFile f(file);
-  if (f.open(QFile::ReadWrite | QFile::Text) == false)
+  std::ifstream f(file.toStdString(), std::ios::binary /* Necessary to preserve e.g. \r on Windows */);
+  if (!f)
     return false;
 
-  QTextStream in(&f);
-  // Load the entire file into memory (expensive but necessary)
-  QString line;
-  while(!in.atEnd()) {
-    line = in.readLine();
+  // Load the entire file into memory (memory-expensive but necessary)
+  std::stringstream strStream;
+  strStream << f.rdbuf();
+  std::string str = strStream.str();
 
-    // This is also necessary: normalize all line endings to \n (Unix-style)
-    QRegExp invalidEnding("\r\n|\r");
-    line.replace(invalidEnding, "\n");
-    // For simplicity convert all tabs into 4 spaces and just deal with those
-    QRegExp tabs("\t");
-    line.replace(tabs, "    ");
-
-    m_plainTextLines.push_back(std::move(line));
-  }
   f.close();
+
+  // Separate lines into different chunks when \n or \r\n is found
+  m_plainTextLines.clear();
+  QString line;
+  for(auto ch : str) {
+    line += ch;
+    if (ch == '\n') {
+      m_plainTextLines.push_back(std::move(line));
+      line.clear();
+    }
+  }
+  // Add an extra empty line if the last line ended with a \n
+  if (!m_plainTextLines.empty()) {
+    auto& lastLine = m_plainTextLines.back();
+    if (!lastLine.isEmpty() && lastLine.endsWith('\n'))
+      m_plainTextLines.emplace_back();
+  }
 
   return true;
 }
@@ -103,10 +113,8 @@ void Document::recalculateDocumentLines () {
 
   if (m_needReLexing) {
     QString m_plainText;
-    for(auto& line : m_plainTextLines) { // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
+    for(auto& line : m_plainTextLines) // Expensive, hopefully this doesn't happen too often - LEX DIRECTLY FROM VECTOR
       m_plainText.append(line);
-      m_plainText += '\n';
-    }
     m_lexer->lexInput(std::move(m_plainText.toStdString()), m_styleDb);
     m_needReLexing = false;
   }
@@ -405,18 +413,46 @@ void Document::setCursorPos(int x, int y) {
 
   // We found a valid EL, y is fine
   m_viewportCursorPos.y = y;
-  // Fix the X coordinate with this EL's length
-  m_viewportCursorPos.x = std::min((int)el->m_characters.size(), x);
 
+  // All viewport X calculations are to be performed not on the original EL.m_characters (characters of the EL),
+  // but on an expanse version with tabs modified into spaces
+  decltype(el->m_characters) tabExpandedVec;
+  for(auto ch : el->m_characters) {
+    if (ch == '\t')
+      tabExpandedVec.resize(tabExpandedVec.size(), '    ');
+     else
+      tabExpandedVec.push_back(ch);
+  }
+
+  // Fix the X coordinate with this EL's length excluding end of line terminators found before x
+  int EOLinExpandedBeforeX = 0;
+  int size = std::min((int)tabExpandedVec.size(), x);
+  for(int i = size - 1; i >= 0; --i) {
+    if (vec[i] == '\n' || vec[i] == '\r')
+      ++EOLinExpandedBeforeX;
+  }
+
+  // Count tabs before the requested x
+  // Align X coordinate if inside a tab area
+
+  // TODO: there is a better way to do this: just treat all tabs as 4 spaces
+  // and store the indices for each tab in a map for every editorline. This makes it easy to move the cursor around
+  // and avoids overly complicated calculations!
+
+
+  // This is the position the user will see on the viewport grid
+  m_viewportCursorPos.x = size + (3 /* remaining to complete a tab */ * tabsInELBeforeX) - EOLinELBeforeX;
+
+  // Now calculate the internal position in the document (tabs and newlines will mess this up)
   m_documentCursorPos.pl = currentPL;
   m_documentCursorPos.el = currentEL;
   m_documentCursorPos.relativeEl = relativeEL;
   m_documentCursorPos.ch = std::accumulate( m_physicalLines[currentPL].m_editorLines.begin(),
                                             m_physicalLines[currentPL].m_editorLines.begin() + relativeEL, 0,
-      [](const int tot, EditorLine& edl) {
-        return tot + (int)edl.m_characters.size();
-  }) + m_viewportCursorPos.x;
-  m_documentCursorPos.relativeCh = m_viewportCursorPos.x;
+                            [](const int tot, EditorLine& edl) {
+                              return tot + (int)edl.m_characters.size();
+                        }) + m_viewportCursorPos.x - (3 /* remaining to complete a tab */ * tabsInELBeforeX);
+  m_documentCursorPos.relativeCh = m_viewportCursorPos.x - (3 /* remaining to complete a tab */ * tabsInELBeforeX);
 }
 
 void Document::typeAtCursor(QString keyStr) {

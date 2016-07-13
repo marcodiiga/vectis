@@ -6,7 +6,7 @@ namespace { // Functions reserved for this TU's internal use
 
   // Detects if a token is a whitespace or newline character
   bool isWhitespace(const QChar c) {
-    if (c == ' ' || c == '\n' || c == '\r')
+    if (c == ' ' || c == '\n' || c == '\r' || c == '\t')
       return true;
     else
       return false;
@@ -203,8 +203,8 @@ void CPPLexer::declarationOrDefinition() { // A scope declaration or definition
     foundSegment = true;
   }
   // Skip whitespaces and stuff that we're not interested in
-  while (str->at(pos) == ' ' || str->at(pos) == '\n') {
-    pos++;
+  while (str->at(pos) == ' ' || str->at(pos) == '\t' || str->at(pos) == '\r' || str->at(pos) == '\n') {
+    ++pos;
   }
 
   if (str->at(pos) == '(') {
@@ -415,20 +415,28 @@ void CPPLexer::defineStatement() {
   //
 
   size_t startSegment = pos;
-  while (str->at(pos) != '(' && str->at(pos) != ' ' && str->at(pos) != '\n') {
-    pos++;
+  while (str->at(pos) != '(' && str->at(pos) != ' ' && str->at(pos) != '\t'
+         && str->at(pos) != '\r' && str->at(pos) != '\n')
+  {
+    ++pos;
   }
   addSegment(startSegment, pos - startSegment, Identifier);
 
-  // Regular style for all the rest. A macro, even multiline, ends when a newline not preceded
-  // by \ is found
-  startSegment = pos;
-  while (!(str->at(pos) == '\n' && str->at(pos - 1) != '\\')) {
-    pos++;
+  // Regular style for all the rest. A macro, even multiline, ends when a newline (\n or \r\n)
+  // not preceded by \ is found
+  startSegment = pos;  
+
+  // while we don't have \\\n or \\\r\n
+  while(  str->at(pos) != '\n' || str->at(pos - 1) == '\\' ||
+         (str->at(pos - 1) == '\r' && str->at(pos - 2) == '\\') ) {
+
+    pos++; // Keep on looping
   }
+  ++pos; // Also add newline to the segment
+
   addSegment(startSegment, pos - startSegment, Normal);
 
-  // Do not add the \n to the directive (it will be handled outside)
+  // pos is already on the next character
 }
 
 void CPPLexer::nondefinePreprocessorStatement() {
@@ -465,7 +473,7 @@ void CPPLexer::lineCommentStatement() {
   while (str->at(pos) != '\n') {
     pos++;
   }
-  // Do not add the \n to the comment (it will be handled outside)
+  ++pos; // Also add the newline
 
   addSegment(startSegment, pos - startSegment, Comment);
 }
@@ -497,6 +505,7 @@ void CPPLexer::usingStatement() {
   while (str->at(pos) != '\n') {
     pos++;
   }
+  ++pos; // Also add newline
   addSegment(startSegment, pos - startSegment, Normal);
 }
 
@@ -520,7 +529,7 @@ void CPPLexer::includeStatement() {
         return; // Interrupt if a newline is found
       pos++;
     }
-    pos++;
+    pos++; // Also add '"'
 
     addSegment(segmentStart, pos - segmentStart, QuotedString);
   }
@@ -534,7 +543,7 @@ void CPPLexer::includeStatement() {
         return; // Interrupt if a newline is found
       pos++;
     }
-    pos++;
+    pos++; // Also add '>'
 
     addSegment(segmentStart, pos - segmentStart, QuotedString);
   }
@@ -563,7 +572,7 @@ void CPPLexer::globalScope() {
   while (true) {
 
     // Skip newlines and whitespaces
-    while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n') {
+    while (str->at(pos) == ' ' || str->at(pos) == '\r' || str->at(pos) == '\n' || str->at(pos) == '\t') {
       // addSegment(pos, 1, Normal); // This is not needed
       pos++;
     }
