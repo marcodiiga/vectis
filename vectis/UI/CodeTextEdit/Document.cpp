@@ -500,6 +500,8 @@ void Document::typeNewlineAtCursor() {
                                       // another line which fits the wrap
   m_documentCursorPos.ch = 0;
   m_documentCursorPos.relativeCh = 0;
+
+  ++m_numberOfEditorLines;
 }
 
 void Document::typeAtCursor(QString keyStr) {

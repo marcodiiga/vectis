@@ -209,6 +209,7 @@ void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
                                              fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
       // Save the current slider position in the document
       m_document->m_storeSliderPos = m_sliderValue;
+
     m_documentMutex.unlock();
   m_messageQueueMutex.unlock();
 
@@ -416,18 +417,25 @@ void CodeTextEdit::renderDocumentOnPixmap() {
 
 void CodeTextEdit::paintEvent (QPaintEvent *) {
 
-  QPainter view(viewport());
+  QPainter view(viewport());  
+
+  //////////////////////////////////////////////////////////////////////
+  // Draw the document
+  //////////////////////////////////////////////////////////////////////
+
+  if( m_renderingThread->isRunning() == true ) // Wait for any redraw cycle to end first
+      m_renderingThread->wait();
+
+  m_documentMutex.lock();
+
+  // Even the background redraw is done only once acquired the lock to prevent only the
+  // background being displayed while waiting for the document to become ready
 
   // Draw control background (this blends with the TabsBar selected tab's bottom color)
   const QBrush backgroundBrush(QColor(39, 40, 34));
   view.setBrush(backgroundBrush);
   view.fillRect(rect(), backgroundBrush);
 
-  //////////////////////////////////////////////////////////////////////
-  // Draw the document
-  //////////////////////////////////////////////////////////////////////
-
-  m_documentMutex.lock();
   if (m_document != nullptr) {
     // Apply the offset and draw the pixmap on the viewport
     int scrollOffset = m_sliderValue * fontMetrics().height();
@@ -482,6 +490,9 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
   }
 
   m_documentMutex.unlock();
+
+  if( m_renderingThread->isRunning() == false )
+      m_renderingThread->start();
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
 
