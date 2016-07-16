@@ -78,11 +78,17 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   m_renderingThread = std::make_unique<RenderingThread>(*this);
   connect(m_renderingThread.get(), SIGNAL(documentSizeChangedFromThread(const QSizeF&, const qreal)),
           this, SLOT(documentSizeChangedFromThread(const QSizeF&, const qreal)));
+
+  m_renderingThread->start();
+}
+
+CodeTextEdit::~CodeTextEdit() {
+  m_termination = true;
+  m_messageQueueCV.wakeAll();
+  m_renderingThread->wait();
 }
 
 void CodeTextEdit::unloadDocument() {
-  if (m_renderingThread->isRunning() == true)
-    m_renderingThread->wait(); // Wait for all drawing operations to finish
 
   m_documentMutex.lock();
   m_document = nullptr;
@@ -96,8 +102,8 @@ void CodeTextEdit::unloadDocument() {
 
 void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
 
-  if (m_renderingThread->isRunning() == true)
-    m_renderingThread->wait(); // Wait for all drawing operations to finish
+  //if (m_renderingThread->isRunning() == true)
+  //  m_renderingThread->wait(); // Wait for all drawing operations to finish
 
 
   m_documentMutex.lock();
@@ -122,12 +128,11 @@ void CodeTextEdit::loadDocument(Document *doc, int VScrollbarPos) {
   m_documentMutex.unlock();
 
   m_messageQueueMutex.lock();
-  m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
-                                         fontMetrics().height() + 20 /* Remember to compensate the offset */);
+    m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                           fontMetrics().height() + 20 /* Remember to compensate the offset */);
   m_messageQueueMutex.unlock();
 
-  if( m_renderingThread->isRunning() == false )
-      m_renderingThread->start();  
+  m_messageQueueCV.wakeOne();
 
 //  QSizeF newSize;
 //  newSize.setHeight( m_document->m_numberOfEditorLines );
@@ -174,7 +179,6 @@ void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
   if (!m_document)
     return;  
 
-
   // Keep this safe from race conditions
   m_documentMutex.lock();
 
@@ -190,36 +194,23 @@ void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
     if (m_document->m_lexer)
       m_document->m_needReLexing = true;
 
-    //m_document->recalculateDocumentLines();
+    // Save the current slider position in the document
+    m_document->m_storeSliderPos = m_sliderValue;
 
-    // Adjust the number of lines of the pixmap if no longer enough
-    int Yneeded = m_document->m_numberOfEditorLines * fontMetrics().height() + BITMAP_OFFSET_Y;
-    if (m_documentPixmap->rect().height() < Yneeded)
-      // Expensive - reallocation of the internal pixmap
-      m_documentPixmap = std::make_unique<QImage>(viewport()->width(), (m_document->m_numberOfEditorLines * 2) *
-                                                    fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */,
-                                                    QImage::Format_ARGB32_Premultiplied);
+    auto numEditorLines = m_document->m_numberOfEditorLines;
 
   m_documentMutex.unlock();
 
 
   m_messageQueueMutex.lock();
 
-    if( m_renderingThread->isRunning() == false ) // Make sure the rendering thread is ready as soon as we release the lock
-        m_renderingThread->start();
-
-    m_documentUpdateMessages.clear(); // Drop previous old message
-
     // Post a resize message for the rendering thread (same size)
-    m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
+    m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), numEditorLines *
                                            fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
 
   m_messageQueueMutex.unlock();
 
-  // Save the current slider position in the document
-  m_document->m_storeSliderPos = m_sliderValue;
-
-  //this->update();
+  m_messageQueueCV.wakeOne(); // Wake up rendering thread
 }
 
 // As the name suggests: render the entire document on the internal stored pixmap
@@ -426,9 +417,6 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
   // Draw the document
   //////////////////////////////////////////////////////////////////////
 
-  if( m_renderingThread->isRunning() == true ) // Wait for any redraw cycle to end first
-      m_renderingThread->wait();
-
   m_documentMutex.lock();
 
   // Even the background redraw is done only once acquired the lock to prevent only the
@@ -492,28 +480,27 @@ void CodeTextEdit::paintEvent (QPaintEvent *) {
     m_caretAlphaInterpolator.stop();
   }
 
-  m_documentMutex.unlock();
-
-  if( m_renderingThread->isRunning() == false )
-      m_renderingThread->start();
+  m_documentMutex.unlock();  
 }
 void CodeTextEdit::resizeEvent (QResizeEvent *evt) {
 
   if (!m_document)
     return;
 
-  m_messageQueueMutex.lock();
-    m_documentMutex.lock();
+  m_firstResizeHasHappened = true;
+
+  m_messageQueueMutex.lock();    
       // Post a resize message for the rendering thread
       m_documentUpdateMessages.emplace_back( evt->size().width(), viewport()->width(), m_document->m_numberOfEditorLines *
                                              fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
-      // Save the current slider position in the document
-      m_document->m_storeSliderPos = m_sliderValue;
-    m_documentMutex.unlock();
   m_messageQueueMutex.unlock();
 
-  if( m_renderingThread->isRunning() == false )
-      m_renderingThread->start();
+  m_documentMutex.lock();
+    // Save the current slider position in the document
+    m_document->m_storeSliderPos = m_sliderValue;
+  m_documentMutex.unlock();
+
+  m_messageQueueCV.wakeOne();
 }
 
 void CodeTextEdit::verticalSliderValueChanged (int value) {
@@ -533,49 +520,67 @@ void CodeTextEdit::documentSizeChangedFromThread(const QSizeF &newSize, const qr
 //  this->verticalScrollBar()->setSingleStep(5);
 //  this->verticalScrollBar()->setPageStep(50);
 
-  this->repaint();
+  this->update();
 }
 
 ///////////////////////////////////////////////
 ///            RenderingThread              ///
 ///////////////////////////////////////////////
 
-void RenderingThread::run() {
+void RenderingThread::run() {    
 
-  while(getFrontElement() == true) {
+  while (true) {
+
+    m_cte.m_messageQueueMutex.lock();
+    while(m_cte.m_documentUpdateMessages.empty() && !m_cte.m_termination)
+      m_cte.m_messageQueueCV.wait(&m_cte.m_messageQueueMutex); // Sleep and wait for new messages
+
+    if (m_cte.m_termination) {
+      m_cte.m_messageQueueMutex.unlock();
+      return; // Terminate immediately
+    }
+
+    m_currentElement = m_cte.m_documentUpdateMessages.back();
+    m_cte.m_documentUpdateMessages.clear(); // We're ONLY interested in the front object
+
+    m_cte.m_messageQueueMutex.unlock();
+
+    if (m_cte.m_firstResizeHasHappened == false) {
+      continue; // Nope, window needs some more initialization
+    }
+
+    //<< Start processing the data >>//
+
     m_cte.m_documentMutex.lock();
     m_cte.m_document->setWrapWidth(m_currentElement.wrapWidth);
 
-    m_cte.m_backgroundBufferPixmap = std::make_unique<QImage>(m_currentElement.bufferWidth,
-                                                              m_currentElement.bufferHeight,
-                                                              QImage::Format_ARGB32_Premultiplied);
+    // Reallocate background pixmap if necessary
+    if (!m_cte.m_backgroundBufferPixmap ||
+        m_cte.m_backgroundBufferPixmap->height() != m_currentElement.bufferHeight ||
+        m_cte.m_backgroundBufferPixmap->width() != m_currentElement.bufferWidth )
+    {
+      m_cte.m_backgroundBufferPixmap = std::make_unique<QImage>(m_currentElement.bufferWidth,
+                                                                m_currentElement.bufferHeight,
+                                                                QImage::Format_ARGB32_Premultiplied);
+    }
 
     m_cte.m_documentMutex.unlock();
 
     m_cte.renderDocumentOnPixmap();
+    //qDebug() << "RENDERED";
 
     // Even if the document's size might not have changed, we still need to fire a documentSizeChanged
     // event since scrollbars use this also to calculate the maximum number of lines our viewport can display
     QSizeF newSize;
     qreal lineHeight = m_cte.fontMetrics().height();
     newSize.setHeight( m_cte.m_document->m_numberOfEditorLines );
-    newSize.setWidth ( m_cte.m_document->m_maximumCharactersLine );
+    // newSize.setWidth ( 0 ); // Width is unused
 
     // Emit a documentSizeChanged signal. This will trigger scrollbars 'maxViewableLines' calculations
     emit documentSizeChangedFromThread ( newSize, lineHeight );
-  }
-}
 
-bool RenderingThread::getFrontElement() {
-  bool elementFound = false;
-  m_cte.m_messageQueueMutex.lock();
-  if (m_cte.m_documentUpdateMessages.size() > 0) {
-    m_currentElement = m_cte.m_documentUpdateMessages.back();
-    m_cte.m_documentUpdateMessages.clear(); // We're ONLY interested in the front object
-    elementFound = true;
-  }
-  m_cte.m_messageQueueMutex.unlock();
-  return elementFound;
+
+  } // Start all over for new messages
 }
 
 CaretBlinkingInterpolation::CaretBlinkingInterpolation(CodeTextEdit& parent) :

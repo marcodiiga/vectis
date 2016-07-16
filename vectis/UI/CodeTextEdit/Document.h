@@ -71,7 +71,7 @@ private:
 
     int m_wrapWidth;
     int m_numberOfEditorLines;
-    int m_maximumCharactersLine; // According to wrapWidth
+    // int m_maximumCharactersLine; // According to wrapWidth
 
     std::unique_ptr<LexerBase> m_lexer;
     bool m_needReLexing; // Whether the document needs re-lexing

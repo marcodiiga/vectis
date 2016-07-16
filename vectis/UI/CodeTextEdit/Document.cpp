@@ -128,7 +128,7 @@ void Document::recalculateDocumentLines () {
   // Drop previous lines
   m_physicalLines.clear();
   m_numberOfEditorLines = 0;
-  m_maximumCharactersLine = 0;
+  // m_maximumCharactersLine = 0;
 
 
   std::function<std::vector<PhysicalLine> (const QString&)> mapFn = [&,this](const QString& line) {
@@ -195,11 +195,11 @@ void Document::recalculateDocumentLines () {
     accumulator.insert(accumulator.end(), pl.begin(), pl.end());
 
     m_numberOfEditorLines += static_cast<int>(pl[0].m_editorLines.size()); // Some more EditorLine
-    std::for_each(pl[0].m_editorLines.begin(), pl[0].m_editorLines.end(), [this](const EditorLine& eline) {
-      int lineLength = static_cast<int>(eline.m_characters.size());
-      if (lineLength > m_maximumCharactersLine) // Check if this is the longest line found ever
-        m_maximumCharactersLine = lineLength;
-    });
+//    std::for_each(pl[0].m_editorLines.begin(), pl[0].m_editorLines.end(), [this](const EditorLine& eline) {
+//      int lineLength = static_cast<int>(eline.m_characters.size());
+//      if (lineLength > m_maximumCharactersLine) // Check if this is the longest line found ever
+//        m_maximumCharactersLine = lineLength;
+//    });
 
   };
 

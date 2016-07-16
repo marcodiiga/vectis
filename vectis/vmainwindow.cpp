@@ -44,7 +44,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  loadDocumentFromFile("../vectis/TestData/SimpleFile.cpp", false);
+  loadDocumentFromFile("C:\\Users\\Alex\\Desktop\\Varco\\src\\WindowHandling\\BaseOSWindow_Linux.cpp", false);
 
   // Load some other sample data
   //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);

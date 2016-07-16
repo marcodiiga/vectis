@@ -58,6 +58,7 @@ class CodeTextEdit : public QAbstractScrollArea {
     Q_OBJECT
 public:
     explicit CodeTextEdit(QWidget *parent = 0);
+    ~CodeTextEdit();
 
     // Load a document into the viewport
     void loadDocument(Document *doc, int VScrollbarPos = 0);
@@ -83,12 +84,15 @@ private:
     std::unique_ptr<QImage> m_backgroundBufferPixmap; // The background buffer
     QMutex m_documentMutex;
     std::unique_ptr<RenderingThread> m_renderingThread;
+    bool m_termination = false; // Signal the thread to terminate
     std::vector<ResizeParameters> m_documentUpdateMessages;
     QMutex m_messageQueueMutex;
+    QWaitCondition m_messageQueueCV;
 
     // To have wrapping work, the resize event will be forwarded to the loaded
     // document
     void resizeEvent(QResizeEvent *evt);
+    bool m_firstResizeHasHappened = false;
 
     int m_sliderValue = 0; // The slider value - gets updated by verticalSliderValueChanged.
                            // It is the Y offset into the document expressed in the line number
