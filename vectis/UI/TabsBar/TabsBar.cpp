@@ -479,7 +479,7 @@ void TabsBar::mousePressEvent(QMouseEvent *evt) {
             }
         }
     }
-    qDebug() << "mousePressEvent " << m_dragStartPosition;
+    // qDebug() << "mousePressEvent " << m_dragStartPosition;
 }
 
 // This event deals with tab dragging (tracking)
@@ -622,7 +622,7 @@ void TabsBar::mouseReleaseEvent(QMouseEvent *) {
     if( m_draggingInProgress == false )
         return;
 
-    qDebug() << "Tracking ended";
+    // qDebug() << "Tracking ended";
 
     // Animate the "return" to the correct position, i.e. decreases the XTrackingDistance to zero
     m_tabs[m_selectedTabIndex]->m_Xoffset = m_XTrackingDistance; // Must go to zero

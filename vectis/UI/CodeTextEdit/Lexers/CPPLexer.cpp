@@ -132,7 +132,7 @@ void CPPLexer::lexInput(std::string input, StyleDatabase& sdb) {
     globalScope();
   }
   catch (std::out_of_range&) {
-    qDebug() << "Parsing terminated!";
+    // qDebug() << "Parsing terminated!";
   }
 }
 

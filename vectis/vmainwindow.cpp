@@ -125,7 +125,7 @@ void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
 }
 
 void VMainWindow::selectedTabChangedSlot (int oldId, int newId) {
-  qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
+  // qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
 
   if (m_tabDocumentMap.find(newId) == m_tabDocumentMap.end())
     return; // This tab hasn't an associated document. Do nothing.
@@ -156,7 +156,7 @@ void VMainWindow::selectedTabChangedSlot (int oldId, int newId) {
 }
 
 void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
-  qDebug() << "Tab was requested to close: " << tabId;
+  // qDebug() << "Tab was requested to close: " << tabId;
 
   m_tabsBar->deleteTab(tabId); // Start tabs bar deletion process and new candidate selection process
 

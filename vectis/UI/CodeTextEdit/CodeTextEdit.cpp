@@ -158,7 +158,7 @@ void CodeTextEdit::mousePressEvent(QMouseEvent *evt) {
     // Find the cell where the click was performed (x;y)
     int y = m_sliderValue + evt->pos().y() / fontMetrics().height();
     int x = (evt->pos().x() - BITMAP_OFFSET_X) / m_characterWidthPixels;
-    qDebug() << "Click in document detected: (" << x << ";" << y << ")";
+    // qDebug() << "Click in document detected: (" << x << ";" << y << ")";
 
     m_documentMutex.lock();
       m_document->setCursorPos(x, y);
@@ -172,51 +172,54 @@ void CodeTextEdit::mousePressEvent(QMouseEvent *evt) {
 
 void CodeTextEdit::keyPressEvent(QKeyEvent *event) {
   if (!m_document)
-    return;
-
-  if (m_renderingThread->isRunning() == true)
-    m_renderingThread->wait(); // Wait for all drawing operations to finish
+    return;  
 
 
-  m_messageQueueMutex.lock(); // Keep this safe from race conditions
-    m_documentMutex.lock();
+  // Keep this safe from race conditions
+  m_documentMutex.lock();
 
-      // Enter or numpad enter for \n
-      if( (event->key() == Qt::Key_Enter) || (event->key() == Qt::Key_Return) )
-        m_document->typeNewlineAtCursor();
-      else {
-        // Modify document data inserting text
-        QString keyStr = event->text(); // Translates input to a unicode QString for a key
-        m_document->typeAtCursor(keyStr);
-      }
+    // Enter or numpad enter for \n
+    if( (event->key() == Qt::Key_Enter) || (event->key() == Qt::Key_Return) )
+      m_document->typeNewlineAtCursor();
+    else {
+      // Modify document data inserting text
+      QString keyStr = event->text(); // Translates input to a unicode QString for a key
+      m_document->typeAtCursor(keyStr);
+    }
 
-      if (m_document->m_lexer)
-        m_document->m_needReLexing = true;
+    if (m_document->m_lexer)
+      m_document->m_needReLexing = true;
 
-      m_document->recalculateDocumentLines();
+    //m_document->recalculateDocumentLines();
 
-      // Adjust the number of lines of the pixmap if no longer enough
-      int Yneeded = m_document->m_numberOfEditorLines * fontMetrics().height() + BITMAP_OFFSET_Y;
-      if (m_documentPixmap->rect().height() < Yneeded)
-        // Expensive - reallocation of the internal pixmap
-        m_documentPixmap = std::make_unique<QImage>(viewport()->width(), (m_document->m_numberOfEditorLines * 2) *
-                                                      fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */,
-                                                      QImage::Format_ARGB32_Premultiplied);
+    // Adjust the number of lines of the pixmap if no longer enough
+    int Yneeded = m_document->m_numberOfEditorLines * fontMetrics().height() + BITMAP_OFFSET_Y;
+    if (m_documentPixmap->rect().height() < Yneeded)
+      // Expensive - reallocation of the internal pixmap
+      m_documentPixmap = std::make_unique<QImage>(viewport()->width(), (m_document->m_numberOfEditorLines * 2) *
+                                                    fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */,
+                                                    QImage::Format_ARGB32_Premultiplied);
+
+  m_documentMutex.unlock();
 
 
-      // Post a resize message for the rendering thread (same size)
-      m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
-                                             fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
-      // Save the current slider position in the document
-      m_document->m_storeSliderPos = m_sliderValue;
+  m_messageQueueMutex.lock();
 
-    m_documentMutex.unlock();
+    if( m_renderingThread->isRunning() == false ) // Make sure the rendering thread is ready as soon as we release the lock
+        m_renderingThread->start();
+
+    m_documentUpdateMessages.clear(); // Drop previous old message
+
+    // Post a resize message for the rendering thread (same size)
+    m_documentUpdateMessages.emplace_back( viewport()->width(), viewport()->width(), m_document->m_numberOfEditorLines *
+                                           fontMetrics().height() + BITMAP_OFFSET_Y /* Remember to compensate the offset */ );
+
   m_messageQueueMutex.unlock();
 
-  if( m_renderingThread->isRunning() == false )
-      m_renderingThread->start();
+  // Save the current slider position in the document
+  m_document->m_storeSliderPos = m_sliderValue;
 
-  this->update();
+  //this->update();
 }
 
 // As the name suggests: render the entire document on the internal stored pixmap
