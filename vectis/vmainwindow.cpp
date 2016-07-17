@@ -1,10 +1,14 @@
 #include "vmainwindow.h"
 #include "ui_vmainwindow.h"
-#include <UI/CodeTextEdit/Document.h>
+#include <QMimeData>
+#include <QFileInfo>
 #include <QPainter>
 #include <QScrollArea>
 #include <QLayout>
 #include <memory>
+
+// Highlighters
+#include <UI/Highlighters/CPPHighlighter.h>
 
 #include <QDebug>
 
@@ -53,10 +57,10 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
   // NOTICE: link connections AFTER all initial documents have been created
   // Link the "changed selected tab" and "tab was requested to close" signals to slots
-  connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int, int)),
-          this, SLOT(selectedTabChangedSlot(int, int)));
-  connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
-          this, SLOT(tabWasRequestedToCloseSlot(int)));
+//  connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int, int)),
+//          this, SLOT(selectedTabChangedSlot(int, int)));
+//  connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
+//          this, SLOT(tabWasRequestedToCloseSlot(int)));
 
   // Mark window as accepting drag'n'drops
   setAcceptDrops(true);
@@ -104,78 +108,103 @@ void VMainWindow::dropEvent (QDropEvent *event) {
   event->acceptProposedAction();
 }
 
+// Get an instance of a supported and appropriate syntax highlighter for an extension
+// or return nullptr if none could be found
+QSyntaxHighlighter* VMainWindow::getSyntaxHighlighterFromExtension (QString extension) {
+  if (extension == "cpp" || extension == "c" || extension == "h" ||
+      extension == "cxx" || extension == "hpp")
+  {
+    return new CPPHighlighter();
+  }
+  return nullptr;
+}
+
 void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
 
   QFileInfo fileInfo(path); // Strip filename from path
   QString filename(fileInfo.fileName());
 
   // Create document, tab and apply proper lexers
+
+  QFile file(path);
+  if (!file.open(QFile::ReadWrite | QFile::Text))
+      throw std::runtime_error("Could not open file");
+
+  // Create a new tab and its respective tab id
   int id = m_tabsBar->insertTab(filename, animation);
-  auto it = m_tabDocumentMap.insert(std::make_pair(id, std::make_unique<Document>(*m_customCodeEdit)));
+  // Store it into the document map and create a new QTextDocument
+  auto it = m_tabDocumentMap.emplace(id, std::make_unique<QTextDocument>());
   auto& document = it.first->second;
-  document->loadFromFile( path );
+  document->setDefaultStyleSheet("body { color : white; }");
+  document->setDefaultFont(m_customCodeEdit->m_monospaceFont);
+
+  document->setPlainText( file.readAll() ); // Load the document with the file text
 
   // Try to detect a suitable syntax highlighting scheme from the file extension
-  QString extension(fileInfo.completeSuffix());
-  auto syntaxHighlighting = getSuggestedSyntaxHighlightFromExtension(extension);
-  document->applySyntaxHighlight( syntaxHighlighting );
-
-  // Finally load the newly created document in the viewport
-  m_customCodeEdit->loadDocument( document.get() );
-}
-
-void VMainWindow::selectedTabChangedSlot (int oldId, int newId) {
-  // qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
-
-  if (m_tabDocumentMap.find(newId) == m_tabDocumentMap.end())
-    return; // This tab hasn't an associated document. Do nothing.
-
-  // Save current vertical scrollbar position (there is always a vscrollbar) before switching document
-  if (oldId != -1)
-    m_tabDocumentVScrollPos[oldId] = m_customCodeEdit->m_verticalScrollBar->value();
-
-  // Restore (if any) vertical scrollbar position
-  auto it = m_tabDocumentVScrollPos.find(newId);
-  int vScrollbarPos = 0;
-  if (it != m_tabDocumentVScrollPos.end())
-    vScrollbarPos = it->second;
-
-  // Finally load the new requested document
-  m_customCodeEdit->loadDocument( m_tabDocumentMap[newId].get(), vScrollbarPos );
-
-
-
-  // Save everything to buffer
-  //    contents[currentlySelected] = m_customCodeEdit->toPlainText();
-  //    currentlySelected = newId;
-  //    auto it = contents.find(newId);
-  //    if (it != contents.end())
-  //      m_customCodeEdit->setText(it->second);
-  //    else
-  //      m_customCodeEdit->setText("");
-}
-
-void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
-  // qDebug() << "Tab was requested to close: " << tabId;
-
-  m_tabsBar->deleteTab(tabId); // Start tabs bar deletion process and new candidate selection process
-
-  {
-    // Delete document and tab id
-    auto it = m_tabDocumentMap.find(tabId);
-    m_tabDocumentMap.erase(it);
-
-    // Also delete the VScrollBar position history (if any)
-    auto itv = m_tabDocumentVScrollPos.find(tabId);
-    if (itv != m_tabDocumentVScrollPos.end())
-      m_tabDocumentVScrollPos.erase(itv);
+  QString extension( fileInfo.completeSuffix() );
+  if (!extension.isEmpty()) {
+    auto syntaxHighlighter = getSyntaxHighlighterFromExtension( extension );
+    if (syntaxHighlighter != nullptr) {
+      syntaxHighlighter->setDocument ( document.get() );
+      m_tabDocumentSyntaxHighlighter.emplace ( id, syntaxHighlighter );
+    }
   }
-
-  // If we don't have any other document loaded, unload the viewport completely (but do not halt the
-  // rendering thread)
-  if(m_tabDocumentMap.empty())
-    m_customCodeEdit->unloadDocument();  
+  // Finally load the newly created document in the viewport
+  m_customCodeEdit->setDocument( document.get() );
 }
+
+//void VMainWindow::selectedTabChangedSlot (int oldId, int newId) {
+//  // qDebug() << "Selected tab has changed from " << oldId << " to " << newId;
+
+//  if (m_tabDocumentMap.find(newId) == m_tabDocumentMap.end())
+//    return; // This tab hasn't an associated document. Do nothing.
+
+//  // Save current vertical scrollbar position (there is always a vscrollbar) before switching document
+//  if (oldId != -1)
+//    m_tabDocumentVScrollPos[oldId] = m_customCodeEdit->m_verticalScrollBar->value();
+
+//  // Restore (if any) vertical scrollbar position
+//  auto it = m_tabDocumentVScrollPos.find(newId);
+//  int vScrollbarPos = 0;
+//  if (it != m_tabDocumentVScrollPos.end())
+//    vScrollbarPos = it->second;
+
+//  // Finally load the new requested document
+//  m_customCodeEdit->loadDocument( m_tabDocumentMap[newId].get(), vScrollbarPos );
+
+
+
+//  // Save everything to buffer
+//  //    contents[currentlySelected] = m_customCodeEdit->toPlainText();
+//  //    currentlySelected = newId;
+//  //    auto it = contents.find(newId);
+//  //    if (it != contents.end())
+//  //      m_customCodeEdit->setText(it->second);
+//  //    else
+//  //      m_customCodeEdit->setText("");
+//}
+
+//void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
+//  // qDebug() << "Tab was requested to close: " << tabId;
+
+//  m_tabsBar->deleteTab(tabId); // Start tabs bar deletion process and new candidate selection process
+
+//  {
+//    // Delete document and tab id
+//    auto it = m_tabDocumentMap.find(tabId);
+//    m_tabDocumentMap.erase(it);
+
+//    // Also delete the VScrollBar position history (if any)
+//    auto itv = m_tabDocumentVScrollPos.find(tabId);
+//    if (itv != m_tabDocumentVScrollPos.end())
+//      m_tabDocumentVScrollPos.erase(itv);
+//  }
+
+//  // If we don't have any other document loaded, unload the viewport completely (but do not halt the
+//  // rendering thread)
+//  if(m_tabDocumentMap.empty())
+//    m_customCodeEdit->unloadDocument();
+//}
 
 VMainWindow::~VMainWindow() {
   delete ui;

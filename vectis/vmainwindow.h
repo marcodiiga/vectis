@@ -4,6 +4,7 @@
 #include <UI/CodeTextEdit/CodeTextEdit.h>
 #include <UI/ScrollBar/ScrollBar.h>
 #include <UI/TabsBar/TabsBar.h>
+#include <QSyntaxHighlighter>
 #include <QDialog>
 #include <QPixmap>
 #include <memory>
@@ -41,8 +42,8 @@ public:
     void loadDocumentFromFile(QString path, bool animation = false);
 
 private slots:
-    void selectedTabChangedSlot(int oldId, int newId);
-    void tabWasRequestedToCloseSlot(int tabId);
+   // void selectedTabChangedSlot(int oldId, int newId);
+   // void tabWasRequestedToCloseSlot(int tabId);
 
 private:
 
@@ -52,11 +53,14 @@ private:
     std::unique_ptr<CodeTextEdit> m_customCodeEdit;
     std::unique_ptr<TabsBar>      m_tabsBar;
 
-    // A map associating Documents to tab ids (which are also document ids)
-    std::map<int, std::unique_ptr<Document>> m_tabDocumentMap;
+    // A map associating QTextDocuments to tab ids (which are also document ids)
+    std::map <int, std::unique_ptr<QTextDocument> > m_tabDocumentMap;
     // A map that stores the vertical scrollbar position for each document (to remember it)
-    std::map<int /* Document/Tab id */, int> m_tabDocumentVScrollPos;
+    std::map <int /* Document/Tab id */, int> m_tabDocumentVScrollPos;
+    // A map that stores the syntax highlighter that a document might have
+    std::map <int /* Document/Tab id */, std::unique_ptr<QSyntaxHighlighter> > m_tabDocumentSyntaxHighlighter;
 
+    QSyntaxHighlighter* getSyntaxHighlighterFromExtension(QString extension);
 };
 
 #endif // VMAINWINDOW_H
