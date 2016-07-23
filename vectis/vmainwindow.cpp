@@ -48,7 +48,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  loadDocumentFromFile("C:\\Users\\Alex\\Desktop\\Varco\\src\\WindowHandling\\BaseOSWindow_Linux.cpp", false);
+  loadDocumentFromFile("C:\\vectis\\vectis\\TestData\\BaseOSWindow_Linux.cpp", false);
 
   // Load some other sample data
   //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
@@ -135,7 +135,10 @@ void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
   // Store it into the document map and create a new QTextDocument
   auto it = m_tabDocumentMap.emplace(id, std::make_unique<QTextDocument>());
   auto& document = it.first->second;
-  document->setDefaultStyleSheet("body { color : white; }");
+  // Apply a plain text document layout
+  QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(document.get());
+  document->setDocumentLayout(layout);
+
   document->setDefaultFont(m_customCodeEdit->m_monospaceFont);
 
   document->setPlainText( file.readAll() ); // Load the document with the file text

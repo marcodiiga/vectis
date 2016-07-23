@@ -7,7 +7,7 @@
 #include <QElapsedTimer>
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
-  QTextEdit(parent)
+  QPlainTextEdit(parent)
 {
 
   Q_ASSERT(parent);
@@ -16,10 +16,9 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   // any system intervention
   // WA_NoSystemBackground avoids the system to draw the background (we'll handle it as well)
   //setAttribute( Qt::WA_OpaquePaintEvent, true );
-  setAttribute( Qt::WA_NoSystemBackground, true );
   setFrameShape( QFrame::NoFrame ); // No widget border allowed (otherwise there would be a separation
                                     // line that doesn't allow this control to blend in with tabs)
-  setStyleSheet( "QWidget { background-color: rgb(22,23,19);     \
+  setStyleSheet( "QWidget { background-color: #272822;     \
                             color : white;                       \
                             padding: 0px; }" ); // Also eliminate padding (needed to avoid QScrollBar spaces)
 

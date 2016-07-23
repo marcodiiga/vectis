@@ -2,11 +2,11 @@
 #define CUSTOMCODEEDIT_H
 #include <UI/CodeTextEdit/Document.h>
 #include <UI/ScrollBar/ScrollBar.h>
-#include <QTextEdit>
+#include <QPlainTextEdit>
 
 
 // The code and text edit control (everything gets rendered to it)
-class CodeTextEdit : public QTextEdit {
+class CodeTextEdit : public QPlainTextEdit {
     Q_OBJECT
 public:
     explicit CodeTextEdit(QWidget *parent = 0);
