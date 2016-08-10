@@ -3,6 +3,11 @@
 #include <QResizeEvent>
 #include <QRegExp>
 #include <QScrollBar>
+#include <QTextBlock>
+#include <QLabel>
+#include <QHBoxLayout>
+#include <algorithm>
+
 #include <QDebug>
 #include <QElapsedTimer>
 
@@ -72,4 +77,77 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 }
 
   )");
+
+
+  QHBoxLayout *layout = new QHBoxLayout(this);
+  layout->addSpacerItem(new QSpacerItem(10, 10, QSizePolicy::Expanding, QSizePolicy::Expanding));
+  QLabel *minimap = new QLabel(this);
+  minimap->setFixedWidth(150);
+  minimap->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+  minimap->setAlignment(Qt::AlignRight);
+  layout->addWidget(minimap);
+
+  minimap->setStyleSheet("QWidget { \
+                         border-style: outset; \
+                         border-width: 1px; \
+//                         border-color: beige; \
+                     }");
+
+
+  connect(this, &QPlainTextEdit::textChanged, this, [minimap, this]() {
+      QSizeF dim = getDocumentDimensions();
+      QPixmap document(dim.width(), dim.height());
+      document.fill(Qt::transparent);
+      getScreenShot(document);
+      if(!document.isNull())
+        minimap->setPixmap(document.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+  });
+
+}
+
+QFont CodeTextEdit::getMonospaceFont() const {
+  return m_monospaceFont;
+}
+
+QSizeF CodeTextEdit::getDocumentDimensions() const {
+//  auto block = document()->firstBlock();
+//  qreal height = 0;
+//  qreal width = 0;
+//  while (block.isValid()) {
+//      QRectF r = blockBoundingRect(block);
+//      height += r.height();
+//      width = std::max(width, r.width());
+//      block = block.next();
+//  }
+
+  auto line_height = QFontMetrics(getMonospaceFont()).height();
+  return QSizeF(document()->size().width(), document()->size().height() * line_height);
+}
+
+void CodeTextEdit::getScreenShot(QPixmap& map) const
+{
+    QPainter painter(&map);
+
+    int offset = 0;
+    auto block = document()->firstBlock();
+
+    while (block.isValid()) {
+
+        QRectF r = blockBoundingRect(block);
+        QTextLayout *layout = block.layout();
+
+        if (!block.isVisible()) {
+
+            offset += r.height();
+            block = block.next();
+            continue;
+
+        } else {
+            layout->draw(&painter, QPoint(0, offset));
+        }
+
+        offset += r.height();
+
+        block = block.next();
+    }
 }

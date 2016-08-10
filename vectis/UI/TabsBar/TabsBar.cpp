@@ -99,7 +99,7 @@ void TabsBar::deleteTab(int id, bool animation) {
 
     // Updates all right interpolators to refer to the right position in the tabs vector and
     // updates all right tabs in the tabId2tabIndex map
-    for (int i = delTabIndex; i < tabsBar.m_tabs.size(); ++i) {
+    for (size_t i = delTabIndex; i < tabsBar.m_tabs.size(); ++i) {
       tabsBar.m_XInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_YInterpolators[i]->m_associatedTabIndex = i; // Assumes same size
       tabsBar.m_tabId2tabIndexMap[tabsBar.m_tabs[i]->getTabId()] = i;

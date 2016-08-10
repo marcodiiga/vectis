@@ -29,6 +29,7 @@ private:
     QRegExp commentStartExpression;
     QRegExp commentEndExpression;
 
+    QTextCharFormat normalText;
     QTextCharFormat keywordFormat;
     QTextCharFormat statementKeywordFormat; // e.g. 'for'
     QTextCharFormat classFormat;

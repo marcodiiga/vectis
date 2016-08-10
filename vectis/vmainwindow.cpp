@@ -12,6 +12,8 @@
 #include <UI/Highlighters/CPPHighlighter.h>
 
 #include <QDebug>
+#include <QLabel>
+#include <QPushButton>
 
 #include <QFontDatabase>
 
@@ -62,6 +64,9 @@ VMainWindow::VMainWindow(QWidget *parent) :
 //          this, SLOT(selectedTabChangedSlot(int, int)));
 //  connect(m_tabsBar.get(), SIGNAL(tabWasRequestedToClose(int)),
 //          this, SLOT(tabWasRequestedToCloseSlot(int)));
+
+
+
 
   // Mark window as accepting drag'n'drops
   setAcceptDrops(true);
@@ -140,7 +145,7 @@ void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
   QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(document.get());
   document->setDocumentLayout(layout);
 
-  document->setDefaultFont(m_customCodeEdit->m_monospaceFont);
+  document->setDefaultFont(m_customCodeEdit->getMonospaceFont());
 
   document->setPlainText( file.readAll() ); // Load the document with the file text
 

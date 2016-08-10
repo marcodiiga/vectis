@@ -5,6 +5,8 @@ CPPHighlighter::CPPHighlighter(QTextDocument *parent)
 {
     HighlightingRule rule;
 
+    normalText.setForeground(Qt::white);
+
     keywordFormat.setForeground(QColor(102, 217, 239)); // Light blue
     keywordFormat.setFontWeight(QFont::Bold);
     QStringList keywordPatterns;
@@ -71,6 +73,8 @@ CPPHighlighter::CPPHighlighter(QTextDocument *parent)
 
 void CPPHighlighter::highlightBlock(const QString &text)
 {
+    setFormat(0, text.length(), normalText);
+
     foreach (const HighlightingRule &rule, highlightingRules) {
         QRegExp expression(rule.pattern);
         int index = expression.indexIn(text);

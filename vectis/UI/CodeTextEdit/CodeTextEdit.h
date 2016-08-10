@@ -11,6 +11,11 @@ class CodeTextEdit : public QPlainTextEdit {
 public:
     explicit CodeTextEdit(QWidget *parent = 0);
 
+    QFont getMonospaceFont() const;
+    void getScreenShot(QPixmap& map) const;
+    QSizeF getDocumentDimensions() const;
+
+private:
     QFont m_monospaceFont;
 };
 
