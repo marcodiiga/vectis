@@ -6,6 +6,7 @@
 #include <QScrollArea>
 #include <QLayout>
 #include <memory>
+#include <utility>
 
 // Highlighters
 #include <UI/Highlighters/CPPHighlighter.h>
@@ -48,7 +49,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  loadDocumentFromFile("C:\\vectis\\vectis\\TestData\\BaseOSWindow_Linux.cpp", false);
+  loadDocumentFromFile("/home/alex/vectis/vectis/TestData/BasicBlock.cpp", false);
 
   // Load some other sample data
   //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
@@ -110,13 +111,13 @@ void VMainWindow::dropEvent (QDropEvent *event) {
 
 // Get an instance of a supported and appropriate syntax highlighter for an extension
 // or return nullptr if none could be found
-QSyntaxHighlighter* VMainWindow::getSyntaxHighlighterFromExtension (QString extension) {
+std::unique_ptr<QSyntaxHighlighter> VMainWindow::getSyntaxHighlighterFromExtension(QString extension) {
   if (extension == "cpp" || extension == "c" || extension == "h" ||
       extension == "cxx" || extension == "hpp")
   {
-    return new CPPHighlighter();
+    return std::make_unique<CPPHighlighter>();
   }
-  return nullptr;
+  return std::unique_ptr<QSyntaxHighlighter>();
 }
 
 void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
@@ -147,9 +148,9 @@ void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
   QString extension( fileInfo.completeSuffix() );
   if (!extension.isEmpty()) {
     auto syntaxHighlighter = getSyntaxHighlighterFromExtension( extension );
-    if (syntaxHighlighter != nullptr) {
+    if (syntaxHighlighter) {
       syntaxHighlighter->setDocument ( document.get() );
-      m_tabDocumentSyntaxHighlighter.emplace ( id, syntaxHighlighter );
+      m_tabDocumentSyntaxHighlighter.emplace ( id, std::move(syntaxHighlighter) );
     }
   }
   // Finally load the newly created document in the viewport

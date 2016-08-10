@@ -30,6 +30,7 @@ private:
     QRegExp commentEndExpression;
 
     QTextCharFormat keywordFormat;
+    QTextCharFormat statementKeywordFormat; // e.g. 'for'
     QTextCharFormat classFormat;
     QTextCharFormat singleLineCommentFormat;
     QTextCharFormat multiLineCommentFormat;

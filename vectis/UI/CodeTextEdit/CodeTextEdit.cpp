@@ -20,7 +20,15 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
                                     // line that doesn't allow this control to blend in with tabs)
   setStyleSheet( "QWidget { background-color: #272822;     \
                             color : white;                       \
-                            padding: 0px; }" ); // Also eliminate padding (needed to avoid QScrollBar spaces)
+                            padding: 0px; /* Also eliminate padding (needed to avoid QScrollBar spaces) */ \
+                            selection-background-color: #49483E; \
+                            selection-color: none; \
+                          }" );
+
+  // Disable highlighted text brush (i.e. use an empty brush to paint over)
+  QPalette p = this->palette();
+  p.setBrush(QPalette::HighlightedText, QBrush());
+  this->setPalette(p);
 
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
@@ -44,8 +52,8 @@ QScrollBar:vertical {
 
 /* Style the handle as an ellipse with some left and right margin */
 QScrollBar::handle:vertical {
-  margin-left: 4px;
-  margin-right: 4px;
+  margin-left: 3px;
+  margin-right: 3px;
   border-radius: 4px;
   background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 rgb(88,88,88), stop:1 rgb(64,64,64));
   min-height: 20px;
