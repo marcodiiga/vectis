@@ -59,8 +59,6 @@ private:
     std::map <int /* Document/Tab id */, int> m_tabDocumentVScrollPos;
     // A map that stores the syntax highlighter that a document might have
     std::map <int /* Document/Tab id */, std::unique_ptr<QSyntaxHighlighter> > m_tabDocumentSyntaxHighlighter;
-
-    std::unique_ptr<QSyntaxHighlighter> getSyntaxHighlighterFromExtension(QString extension);
 };
 
 #endif // VMAINWINDOW_H

@@ -25,7 +25,8 @@ HEADERS  += vmainwindow.h \
             UI/CodeTextEdit/CodeTextEdit.h \
             UI/Highlighters/CPPHighlighter.h \
             UI/ScrollBar/ScrollBar.h \
-            UI/TabsBar/TabsBar.h
+            UI/TabsBar/TabsBar.h \
+    UI/Utils.h
 
 FORMS    += vmainwindow.ui
 

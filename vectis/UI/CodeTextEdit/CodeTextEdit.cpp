@@ -1,4 +1,5 @@
 #include <UI/CodeTextEdit/CodeTextEdit.h>
+#include <UI/Utils.h>
 #include <QPainter>
 #include <QResizeEvent>
 #include <QRegExp>
@@ -6,10 +7,110 @@
 #include <QTextBlock>
 #include <QLabel>
 #include <QHBoxLayout>
+#include <QSyntaxHighlighter>
 #include <algorithm>
 
 #include <QDebug>
 #include <QElapsedTimer>
+
+//class QTextDocumentSub : public QTextDocument {
+//public:
+//  QTextDocumentSub(QObject *parent = Q_NULLPTR) : QTextDocument(parent) {}
+
+//  void QTextDocumentSub::drawContents(QPainter *p, const QRectF &rect = QRectF()) {
+//    qDebug() << "Hello!!";
+//  }
+//};
+
+class MiniMap : public QLabel {
+public:
+  MiniMap(CodeTextEdit *parent = nullptr) :
+    m_parent(parent),
+    QLabel(parent) {
+    setFixedWidth(WIDTH);
+    setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    setAlignment(Qt::AlignRight);
+    this->setStyleSheet("QPlainTextEdit { \
+                             border-style: outset; \
+                             border-width: 1px; \
+                             border-color: red; \
+                           } \
+    ");
+    setMouseTracking(true);
+    //setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    //setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  }
+
+//  void setDocument(QTextDocument *document) {
+//    m_plain_text_edit.setDocument(document);
+//    connect(m_plain_text_edit.document(), &QTextDocument::contentsChanged, [&]() {
+//      QSizeF dim = m_parent->getDocumentDimensions();
+//      QPixmap shot = m_plain_text_edit.grab(QRect(0, 0, dim.width(), dim.height()));
+//      this->setPixmap(shot);
+//    });
+//  }
+
+  void enterEvent(QEvent *event) {
+    m_hovering = true;
+    draw_viewport_placeholder();
+  }
+
+  void leaveEvent(QEvent *event) {
+    if (m_hovering) {
+      this->setPixmap(m_old_pixmap_before_hovering);
+      m_hovering = false;
+    }
+  }
+
+  void draw_viewport_placeholder() {
+    int viewport_y = m_parent->getVScrollbarPos();
+    int viewport_height = m_parent->viewport()->height();
+    QPixmap rectangle(MiniMap::WIDTH, viewport_height);
+    rectangle.fill(QColor(50, 50, 50, 160));
+    m_old_pixmap_before_hovering = this->pixmap()->copy();
+    QPixmap new_pixmap = m_old_pixmap_before_hovering.copy();
+    QPainter paint(&new_pixmap);
+
+    auto dim = m_parent->getDocumentDimensions();
+    // dim.width() : MiniMap::WIDTH = viewport_height : scaled_viewport_height
+    int scaled_viewport_height = (MiniMap::WIDTH * viewport_height) / dim.width();
+    // dim.width() : MiniMap::WIDTH = viewport_y : scaled_viewport_y
+    int scaled_viewport_y = (MiniMap::WIDTH * viewport_y) / dim.width();
+
+    paint.drawPixmap(0, scaled_viewport_y, MiniMap::WIDTH, scaled_viewport_height, rectangle);
+    this->setPixmap(new_pixmap);
+  }
+
+  void reset_highlighter(QString extension) {
+    m_highlighter = std::move(getSyntaxHighlighterFromExtension(extension));
+  }
+
+  QPixmap& map() {
+    return m_map;
+  }
+
+  QVector<QTextBlock>& blocks() {
+    return m_blocks;
+  }
+
+  QVector<QPixmap>& blocks_pixmaps() {
+    return m_blocks_pixmaps;
+  }
+
+static constexpr const int WIDTH = 150;
+
+  QPixmap m_old_pixmap_before_hovering;
+  bool m_hovering = false;
+  QPixmap m_map;
+  QVector<QTextBlock> m_blocks;
+  QVector<QPixmap> m_blocks_pixmaps;
+
+
+  CodeTextEdit *m_parent = nullptr;
+  QPlainTextEdit m_plain_text_edit;
+  std::unique_ptr<QSyntaxHighlighter> m_highlighter;
+
+};
 
 CodeTextEdit::CodeTextEdit(QWidget *parent) :
   QPlainTextEdit(parent)
@@ -79,29 +180,204 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
   )");
 
 
+  // |------------------------------|
+  // |                              |
+  // | <-- spacer --> <- minimap -> |
+  // |                              |
+  // |------------------------------|
   QHBoxLayout *layout = new QHBoxLayout(this);
   layout->addSpacerItem(new QSpacerItem(10, 10, QSizePolicy::Expanding, QSizePolicy::Expanding));
-  QLabel *minimap = new QLabel(this);
-  minimap->setFixedWidth(150);
-  minimap->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-  minimap->setAlignment(Qt::AlignRight);
-  layout->addWidget(minimap);
+  m_minimap = new MiniMap(this);
+  layout->addWidget(m_minimap);
 
-  minimap->setStyleSheet("QWidget { \
-                         border-style: outset; \
-                         border-width: 1px; \
-//                         border-color: beige; \
-                     }");
+  //getScreenShot(m_minimap->map());
 
 
-  connect(this, &QPlainTextEdit::textChanged, this, [minimap, this]() {
-      QSizeF dim = getDocumentDimensions();
-      QPixmap document(dim.width(), dim.height());
-      document.fill(Qt::transparent);
-      getScreenShot(document);
-      if(!document.isNull())
-        minimap->setPixmap(document.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+
+}
+
+void CodeTextEdit::setDocument(QTextDocument *document) {
+
+ // QTextDocumentSubdocument->clone()
+
+  QPlainTextEdit::setDocument(document); // Continue with base class handling
+
+
+
+//  auto seta = this->document()->clone(m_minimap);
+//  QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(seta);
+//  seta->setDocumentLayout(layout);
+
+//  QVariant syntax_highlighter = document->property("syntax_highlighter");
+//  if (!syntax_highlighter.isNull()) {
+//    m_minimap->reset_highlighter(syntax_highlighter.toString());
+//  }
+//  m_minimap->m_highlighter->setDocument(seta);
+//  m_minimap->setDocument(seta);
+//  QFont font;
+//  font.setFamily( "Consolas" );
+//  font.setPixelSize(5);
+//  m_minimap->setFont(font);
+
+
+//    QSizeF dim = getDocumentDimensions();
+//    QPixmap document_pixmap(dim.width(), dim.height());
+//    document_pixmap.fill(Qt::transparent);
+//    this->render(&document_pixmap);
+//    m_minimap->setPixmap(document_pixmap.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+
+
+  connect(this->document(), &QTextDocument::contentsChanged, this, [&]() {
+    // Apply plain text layout and forward to minimap
+    //auto new_document = this->document()->clone(m_minimap);
+    //this->document()->documentLayout()->
+    //QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(new_document);
+    //new_document->setDocumentLayout(layout);
+    //auto document = this->document()->clone(m_minimap);
+    //document->setDocumentLayout(this->document()->documentLayout());
+
+    QSizeF dim = getDocumentDimensions();
+    QRect rect(0, 0, dim.width(), dim.height());
+
+    QPixmap pixmap(dim.width(), dim.height());
+    pixmap.fill(Qt::transparent);
+
+    QRegion region(rect);
+    //this->render(&pixmap, QPoint(0, 0), region);
+    renderDocument(pixmap);
+    //pixmap.save("test.png");
+    m_minimap->setPixmap(pixmap.scaled(MiniMap::WIDTH, m_minimap->height(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+
+    //m_minimap->document()->setPlainText(this->document()->toPlainText());
+  //  m_minimap->setDocument(this->document());
+//    QFont font;
+//    font.setFamily( "Consolas" );
+//    font.setPixelSize(5);
+//    m_minimap->setFont(font);
+
   });
+
+
+//  QSizeF dim = getDocumentDimensions();
+//  QPixmap document_pixmap(dim.width(), dim.height());
+//  document_pixmap.fill(Qt::transparent);
+//  renderDocument(document_pixmap);
+//  if(!document_pixmap.isNull())
+//    m_minimap->setPixmap(document_pixmap.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+
+
+//  QTextBlock block = document()->firstBlock();
+//  block.layout()
+
+//  connect(this->document(), &QTextDocument::contentsChanged , this, [&]() {
+
+
+//    //this->document()->availableUndoSteps();
+//    //qDebug() << "QAbstractTextDocumentLayout::documentSizeChanged";
+
+
+//      QSizeF dim = getDocumentDimensions();
+//      const int height = dim.height();
+//      const int width = std::max((int)dim.width(), this->viewport()->width());
+//      QPixmap document_pixmap(width, height);
+//      document_pixmap.fill(Qt::transparent);
+//      QPainter document_painter(&document_pixmap);
+
+//      QVector<QTextBlock> new_blocks;
+//      QVector<QPixmap> new_blocks_pixmaps;
+//      bool different_blocks = false;
+//      int render_y_offset = 0;
+//      int j = 0; // Index into our stored blocks
+//      for(auto i = 0; i < this->document()->blockCount(); ++i) {
+
+//        QTextBlock& block = this->document()->findBlockByNumber(i);
+//        QRectF block_br = blockBoundingRect(block);
+
+//        if (j >= m_minimap->blocks().size() || m_minimap->blocks()[j] != block) {
+//          // Different, repaint
+//          QPixmap block_pixmap(block_br.width(), block_br.height());
+//          block_pixmap.fill(Qt::transparent);
+//          QPainter block_painter(&block_pixmap);
+
+//          renderBlock(block_painter, block);
+
+//          new_blocks.append(block);
+//          new_blocks_pixmaps.append(block_pixmap);
+
+//          document_painter.drawPixmap(0, render_y_offset, block_pixmap);
+
+//          different_blocks = true;
+//        } else {
+//          // Valid index and block
+
+//          new_blocks.append(m_minimap->blocks()[j]);
+//          new_blocks_pixmaps.append(m_minimap->blocks_pixmaps()[j]);
+
+//          document_painter.drawPixmap(0, render_y_offset, m_minimap->blocks_pixmaps()[j]);
+
+//          ++j;
+//        }
+//        render_y_offset += block_br.height();
+//      }
+
+//      if (different_blocks) {
+//        m_minimap->blocks().swap(new_blocks);
+//        m_minimap->blocks_pixmaps().swap(new_blocks_pixmaps);
+//      }
+
+//      m_minimap->setPixmap(document_pixmap.scaled(MiniMap::WIDTH, dim.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+////       QPixmap document_pixmap(width, height);
+//   //   if (m_minimap->map().width() != width || m_minimap->height() != height)
+//  //      m_minimap->map().scaledToHeight(203, Qt::TransformationMode::)
+//  //    m_minimap->map().fill(Qt::transparent);
+////      renderDocument(document_pixmap);
+////      //if(!document.isNull())
+////      m_minimap->setPixmap(document_pixmap.scaled(MiniMap::WIDTH, dim.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+//  });
+
+
+
+//  connect(this, &QPlainTextEdit::textChanged, this, [minimap, this]() {
+//      QSizeF dim = getDocumentDimensions();
+//      QPixmap document(dim.width(), dim.height());
+//      document.fill(Qt::transparent);
+//      getScreenShot(document);
+//      if(!document.isNull())
+//        minimap->setPixmap(document.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+  //  });
+}
+
+int CodeTextEdit::getVScrollbarPos() const {
+  auto line_height = QFontMetrics(getMonospaceFont()).height();
+  return ((float)this->verticalScrollBar()->value() * line_height);
+}
+
+void CodeTextEdit::paintEvent(QPaintEvent *e)
+{
+
+  QPlainTextEdit::paintEvent(e);
+
+
+  //pixmap.fill(Qt::transparent);
+
+
+
+
+  //QPainter::restoreRedirected(viewport());
+
+ // QSizeF dim = getDocumentDimensions();
+ // QImage bitmap(dim.width(), dim.height(), QImage::Format_ARGB32);
+ // bitmap.fill(Qt::transparent);
+ // QPainter painter(&bitmap);
+ // this->render(&painter, QPoint(), QRegion(), 0);
+//this->grab()
+
+//    QPixmap document_pixmap(dim.width(), dim.height());
+//    document_pixmap.fill(Qt::red);
+//    this->render(&document_pixmap);
+
+
 
 }
 
@@ -124,7 +400,8 @@ QSizeF CodeTextEdit::getDocumentDimensions() const {
   return QSizeF(document()->size().width(), document()->size().height() * line_height);
 }
 
-void CodeTextEdit::getScreenShot(QPixmap& map) const
+// Expensive - renders the entire document on the given pixmap
+void CodeTextEdit::renderDocument(QPixmap& map) const
 {
     QPainter painter(&map);
 
@@ -150,4 +427,18 @@ void CodeTextEdit::getScreenShot(QPixmap& map) const
 
         block = block.next();
     }
+}
+
+void CodeTextEdit::renderBlock(QPainter& painter, const QTextBlock& block) const
+{
+  if (block.isValid()) {
+
+      QRectF r = blockBoundingRect(block);
+      QTextLayout *layout = block.layout();
+
+      if (block.isVisible()) {
+
+          layout->draw(&painter, QPoint(0, 0));
+      }
+  }
 }
