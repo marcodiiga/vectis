@@ -128,6 +128,7 @@ void VMainWindow::loadDocumentFromFile (QString path, bool animation) {
   // Store it into the document map and create a new QTextDocument
   auto it = m_tabDocumentMap.emplace(id, std::make_unique<QTextDocument>());
   auto& document = it.first->second;
+
   // Apply a plain text document layout
   QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(document.get());
   document->setDocumentLayout(layout);

@@ -30,13 +30,13 @@ public:
     setFixedWidth(WIDTH);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     setAlignment(Qt::AlignRight);
-    this->setStyleSheet("QLabel { \
+    /*this->setStyleSheet("QLabel { \
                              border-style: outset; \
                              border-width: 1px; \
                              border-color: red; \
                            } \
-    ");
-    setMouseTracking(true);
+    ");*/
+    //setMouseTracking(true);
     //setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     //setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   }
@@ -61,16 +61,19 @@ public:
       m_dragging = false;
   }
 
-  void mouseReleaseEvent(QMouseEvent *ev) {
+  void mouseReleaseEvent(QMouseEvent *event) {
+    Q_UNUSED(event);
     m_dragging = false;
   }
 
   void enterEvent(QEvent *event) {
+    Q_UNUSED(event);
     m_hovering = true;
     draw_viewport_placeholder();
   }
 
   void leaveEvent(QEvent *event) {
+    Q_UNUSED(event);
     if (m_hovering || m_dragging) {
       draw_document_pixmap(); // Restore (i.e. clear placeholder)
       m_hovering = false;
@@ -160,7 +163,7 @@ public:
     m_highlighter = std::move(getSyntaxHighlighterFromExtension(extension));
   }
 
-  void updatePixmapOffsetFromScrollbar(float percentage = 0.f) {
+  void updatePixmapOffsetFromScrollbar(float percentage = 0.f /* additional percentage as supplied by a mouse offset */) {
     // Update map and placeholder deltas
     auto dim = m_parent->getDocumentDimensions();
     auto viewport_height = m_parent->viewport()->height();
@@ -255,12 +258,21 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
                             padding: 0px; /* Also eliminate padding (needed to avoid QScrollBar spaces) */ \
                             selection-background-color: #49483E; \
                             selection-color: none; \
-                          }" );
+                          } \
+  " );
+  this->setViewportMargins(0, 0, MiniMap::WIDTH, 0);
 
   // Disable highlighted text brush (i.e. use an empty brush to paint over)
   QPalette p = this->palette();
   p.setBrush(QPalette::HighlightedText, QBrush());
   this->setPalette(p);
+
+  //this->setWordWrapMode(QTextOption::ManualWrap); // We'll deal with the wrap ourselves
+
+
+  //setLineWrapMode(LineWrapMode::NoWrap);
+  //setLineWidth(23);
+  //setWordWrapMode(QTextOption::WrapAnywhere);
 
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
@@ -318,164 +330,68 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 
   //getScreenShot(m_minimap->map());
 
-
-  connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [&](int value) {
-    qDebug() << "value changed";
+  // Handler for scrollbar scroll (i.e. update the minimap as well)
+  connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [&](int) {
+    //qDebug() << "value changed";
     if (!m_minimap->m_dragging) {
       m_minimap->m_start_dragging_scrollbar_pos = verticalScrollBar()->value();
       m_minimap->updatePixmapOffsetFromScrollbar();
       m_minimap->draw_document_pixmap();
+      if (m_minimap->m_hovering)
+        m_minimap->draw_viewport_placeholder();
     }
   });
 
+  // Install filter to reroute events we're interested in
+  m_minimap->installEventFilter(this);
+
+  // Callback for too-fast-typing delay
+  connect(&m_regenerate_minimap_delay, &QTimer::timeout, this, [&]() {
+    this->regenerateMiniMap();
+  });
+}
+
+bool CodeTextEdit::eventFilter(QObject *target, QEvent *event) {
+    if(target == m_minimap ) {
+        if (event->type() == QEvent::Wheel) {
+          this->wheelEvent((QWheelEvent*)event);
+          return true;
+        } else {
+          event->ignore();
+          return false;
+        }
+    }
+    return QPlainTextEdit::eventFilter(target, event);
 }
 
 void CodeTextEdit::setDocument(QTextDocument *document) {
 
- // QTextDocumentSubdocument->clone()
+  m_last_document_modification = QDateTime::currentDateTime();
 
   QPlainTextEdit::setDocument(document); // Continue with base class handling
 
 
-
-//  auto seta = this->document()->clone(m_minimap);
-//  QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(seta);
-//  seta->setDocumentLayout(layout);
-
-//  QVariant syntax_highlighter = document->property("syntax_highlighter");
-//  if (!syntax_highlighter.isNull()) {
-//    m_minimap->reset_highlighter(syntax_highlighter.toString());
-//  }
-//  m_minimap->m_highlighter->setDocument(seta);
-//  m_minimap->setDocument(seta);
-//  QFont font;
-//  font.setFamily( "Consolas" );
-//  font.setPixelSize(5);
-//  m_minimap->setFont(font);
-
-
-//    QSizeF dim = getDocumentDimensions();
-//    QPixmap document_pixmap(dim.width(), dim.height());
-//    document_pixmap.fill(Qt::transparent);
-//    this->render(&document_pixmap);
-//    m_minimap->setPixmap(document_pixmap.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
-
-
   connect(this->document(), &QTextDocument::contentsChanged, this, [&]() {
-    // Apply plain text layout and forward to minimap
-    //auto new_document = this->document()->clone(m_minimap);
-    //this->document()->documentLayout()->
-    //QPlainTextDocumentLayout *layout = new QPlainTextDocumentLayout(new_document);
-    //new_document->setDocumentLayout(layout);
-    //auto document = this->document()->clone(m_minimap);
-    //document->setDocumentLayout(this->document()->documentLayout());
 
-    this->regenerateMiniMap();
-
-    //m_minimap->document()->setPlainText(this->document()->toPlainText());
-  //  m_minimap->setDocument(this->document());
-//    QFont font;
-//    font.setFamily( "Consolas" );
-//    font.setPixelSize(5);
-//    m_minimap->setFont(font);
+    if (m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 200) {
+      // We're receiving lots of document modifications in a limited amount of time,
+      // slow down with the minimap regeneration
+      m_regenerate_minimap_delay.stop();
+      m_regenerate_minimap_delay.setInterval(200);
+      m_regenerate_minimap_delay.setSingleShot(true);
+    } else {
+      m_regenerate_minimap_delay.stop();
+      this->regenerateMiniMap();
+      m_last_document_modification = QDateTime::currentDateTime();
+    }
 
   });
-
-
-//  QSizeF dim = getDocumentDimensions();
-//  QPixmap document_pixmap(dim.width(), dim.height());
-//  document_pixmap.fill(Qt::transparent);
-//  renderDocument(document_pixmap);
-//  if(!document_pixmap.isNull())
-//    m_minimap->setPixmap(document_pixmap.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
-
-
-//  QTextBlock block = document()->firstBlock();
-//  block.layout()
-
-//  connect(this->document(), &QTextDocument::contentsChanged , this, [&]() {
-
-
-//    //this->document()->availableUndoSteps();
-//    //qDebug() << "QAbstractTextDocumentLayout::documentSizeChanged";
-
-
-//      QSizeF dim = getDocumentDimensions();
-//      const int height = dim.height();
-//      const int width = std::max((int)dim.width(), this->viewport()->width());
-//      QPixmap document_pixmap(width, height);
-//      document_pixmap.fill(Qt::transparent);
-//      QPainter document_painter(&document_pixmap);
-
-//      QVector<QTextBlock> new_blocks;
-//      QVector<QPixmap> new_blocks_pixmaps;
-//      bool different_blocks = false;
-//      int render_y_offset = 0;
-//      int j = 0; // Index into our stored blocks
-//      for(auto i = 0; i < this->document()->blockCount(); ++i) {
-
-//        QTextBlock& block = this->document()->findBlockByNumber(i);
-//        QRectF block_br = blockBoundingRect(block);
-
-//        if (j >= m_minimap->blocks().size() || m_minimap->blocks()[j] != block) {
-//          // Different, repaint
-//          QPixmap block_pixmap(block_br.width(), block_br.height());
-//          block_pixmap.fill(Qt::transparent);
-//          QPainter block_painter(&block_pixmap);
-
-//          renderBlock(block_painter, block);
-
-//          new_blocks.append(block);
-//          new_blocks_pixmaps.append(block_pixmap);
-
-//          document_painter.drawPixmap(0, render_y_offset, block_pixmap);
-
-//          different_blocks = true;
-//        } else {
-//          // Valid index and block
-
-//          new_blocks.append(m_minimap->blocks()[j]);
-//          new_blocks_pixmaps.append(m_minimap->blocks_pixmaps()[j]);
-
-//          document_painter.drawPixmap(0, render_y_offset, m_minimap->blocks_pixmaps()[j]);
-
-//          ++j;
-//        }
-//        render_y_offset += block_br.height();
-//      }
-
-//      if (different_blocks) {
-//        m_minimap->blocks().swap(new_blocks);
-//        m_minimap->blocks_pixmaps().swap(new_blocks_pixmaps);
-//      }
-
-//      m_minimap->setPixmap(document_pixmap.scaled(MiniMap::WIDTH, dim.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-
-////       QPixmap document_pixmap(width, height);
-//   //   if (m_minimap->map().width() != width || m_minimap->height() != height)
-//  //      m_minimap->map().scaledToHeight(203, Qt::TransformationMode::)
-//  //    m_minimap->map().fill(Qt::transparent);
-////      renderDocument(document_pixmap);
-////      //if(!document.isNull())
-////      m_minimap->setPixmap(document_pixmap.scaled(MiniMap::WIDTH, dim.height(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
-//  });
-
-
-
-//  connect(this, &QPlainTextEdit::textChanged, this, [minimap, this]() {
-//      QSizeF dim = getDocumentDimensions();
-//      QPixmap document(dim.width(), dim.height());
-//      document.fill(Qt::transparent);
-//      getScreenShot(document);
-//      if(!document.isNull())
-//        minimap->setPixmap(document.scaled(150, 700, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
-  //  });
 }
 
 void CodeTextEdit::regenerateMiniMap() {
   QSizeF dim = getDocumentDimensions();
   QRect rect(0, 0, dim.width(), dim.height());
-  qDebug() << rect;
+  //qDebug() << rect;
 
   QPixmap pixmap(rect.width(), rect.height());
   pixmap.fill(Qt::transparent);
@@ -489,7 +405,8 @@ void CodeTextEdit::regenerateMiniMap() {
   // KeepAspectRatioByExpanding keeps the width scaled and expands on the height, but this only
   // works if the document_width / minimap_width ratio is greater than document_height / minimap_height,
   // otherwise the height is kept scaled and the width is expanded (not what we want). Therefore we
-  // switch to a KeepAspectRatio (both width and height) are resized
+  // switch to a KeepAspectRatio (both width and height are resized uniformly) when we're sure we can
+  // fit the width (adjusted with adjustSize anyway)
   if (dim.height() / m_minimap->height() <= dim.width() / MiniMap::WIDTH)
     aspect_ratio_mode = Qt::KeepAspectRatio;
   m_minimap->setPixmap(pixmap.scaled(MiniMap::WIDTH, m_minimap->height(), aspect_ratio_mode, Qt::SmoothTransformation));
@@ -500,32 +417,8 @@ float CodeTextEdit::getVScrollbarPos() const {
   return ((float)this->verticalScrollBar()->value() * line_height);
 }
 
-void CodeTextEdit::paintEvent(QPaintEvent *e)
-{
-
+void CodeTextEdit::paintEvent(QPaintEvent *e) {
   QPlainTextEdit::paintEvent(e);
-
-
-  //pixmap.fill(Qt::transparent);
-
-
-
-
-  //QPainter::restoreRedirected(viewport());
-
- // QSizeF dim = getDocumentDimensions();
- // QImage bitmap(dim.width(), dim.height(), QImage::Format_ARGB32);
- // bitmap.fill(Qt::transparent);
- // QPainter painter(&bitmap);
- // this->render(&painter, QPoint(), QRegion(), 0);
-//this->grab()
-
-//    QPixmap document_pixmap(dim.width(), dim.height());
-//    document_pixmap.fill(Qt::red);
-//    this->render(&document_pixmap);
-
-
-
 }
 
 void CodeTextEdit::resizeEvent(QResizeEvent *e) {
@@ -540,15 +433,6 @@ QFont CodeTextEdit::getMonospaceFont() const {
 }
 
 QSizeF CodeTextEdit::getDocumentDimensions() const {
-//  auto block = document()->firstBlock();
-//  qreal height = 0;
-//  qreal width = 0;
-//  while (block.isValid()) {
-//      QRectF r = blockBoundingRect(block);
-//      height += r.height();
-//      width = std::max(width, r.width());
-//      block = block.next();
-//  }
 
   auto line_height = QFontMetrics(getMonospaceFont()).height();
   this->document()->adjustSize(); // document()->size().width() returns the viewport width (i.e. much wider than

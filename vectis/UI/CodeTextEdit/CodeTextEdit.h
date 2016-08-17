@@ -3,6 +3,8 @@
 #include <UI/CodeTextEdit/Document.h>
 #include <UI/ScrollBar/ScrollBar.h>
 #include <QPlainTextEdit>
+#include <QDateTime>
+#include <QTimer>
 
 class MiniMap;
 
@@ -25,6 +27,9 @@ private:
     QFont m_monospaceFont;
     MiniMap *m_minimap = nullptr;
     void regenerateMiniMap();
+    bool eventFilter(QObject *target, QEvent *event);
+    QDateTime m_last_document_modification;
+    QTimer m_regenerate_minimap_delay;
 };
 
 #endif // CUSTOMCODEEDIT_H
