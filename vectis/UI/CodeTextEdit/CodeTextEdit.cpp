@@ -159,9 +159,10 @@ public:
     draw_viewport_placeholder(); // Apply new placeholder at mouse position
   }
 
-  void reset_highlighter(QString extension) {
-    m_highlighter = std::move(getSyntaxHighlighterFromExtension(extension));
-  }
+//  void reset_highlighter(QString extension) {
+//    m_highlighter = getSyntaxHighlighterFromExtension(extension);
+//    m_highlighter->setParent(this);
+//  }
 
   void updatePixmapOffsetFromScrollbar(float percentage = 0.f /* additional percentage as supplied by a mouse offset */) {
     // Update map and placeholder deltas
@@ -236,8 +237,8 @@ static constexpr const int WIDTH = 150;
 
 
   CodeTextEdit *m_parent = nullptr;
-  QPlainTextEdit m_plain_text_edit;
-  std::unique_ptr<QSyntaxHighlighter> m_highlighter;
+  //QPlainTextEdit m_plain_text_edit;
+  //std::unique_ptr<QSyntaxHighlighter> m_highlighter;
 
 };
 
@@ -260,11 +261,14 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
                             selection-color: none; \
                           } \
   " );
-  this->setViewportMargins(0, 0, MiniMap::WIDTH, 0);
+  setViewportMargins(0, 0, MiniMap::WIDTH, 0);
+  setAcceptDrops(false);
 
   // Disable highlighted text brush (i.e. use an empty brush to paint over)
   QPalette p = this->palette();
   p.setBrush(QPalette::HighlightedText, QBrush());
+  p.setColor(QPalette::Text, Qt::white);
+  p.setColor(QPalette::Base, Qt::white);
   this->setPalette(p);
 
   //this->setWordWrapMode(QTextOption::ManualWrap); // We'll deal with the wrap ourselves
@@ -349,6 +353,8 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
   connect(&m_regenerate_minimap_delay, &QTimer::timeout, this, [&]() {
     this->regenerateMiniMap();
   });
+  m_regenerate_minimap_delay.setInterval(200);
+  m_regenerate_minimap_delay.setSingleShot(true);
 }
 
 bool CodeTextEdit::eventFilter(QObject *target, QEvent *event) {
@@ -364,7 +370,9 @@ bool CodeTextEdit::eventFilter(QObject *target, QEvent *event) {
     return QPlainTextEdit::eventFilter(target, event);
 }
 
-void CodeTextEdit::setDocument(QTextDocument *document) {
+void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
+
+  this->setEnabled(true);
 
   m_last_document_modification = QDateTime::currentDateTime();
 
@@ -386,6 +394,16 @@ void CodeTextEdit::setDocument(QTextDocument *document) {
     }
 
   });
+
+  this->verticalScrollBar()->setValue(scrollbar_pos);
+}
+
+void CodeTextEdit::unloadDocument() {
+
+    //delete this->document();
+  this->document()->disconnect(this);
+  QPlainTextEdit::setDocument(nullptr);
+  this->setEnabled(false);
 }
 
 void CodeTextEdit::regenerateMiniMap() {
@@ -447,6 +465,7 @@ void CodeTextEdit::renderDocument(QPixmap& map) const
     QPainter painter(&map);
 
     int offset = 0;
+    document()->adjustSize();
     auto block = document()->firstBlock();
 
     while (block.isValid()) {

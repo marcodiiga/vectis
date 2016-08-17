@@ -18,7 +18,8 @@ public:
     void renderDocument(QPixmap& map) const;
     QSizeF getDocumentDimensions() const;    
     void renderBlock(QPainter &painter, const QTextBlock &block) const;
-    void setDocument(QTextDocument *document);
+    void setDocument(QTextDocument *document, int scrollbar_pos = 0);
+    void unloadDocument();
 
     float getVScrollbarPos() const;
     void paintEvent(QPaintEvent *e);

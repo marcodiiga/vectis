@@ -7,16 +7,17 @@
 
 // Highlighters
 #include <UI/Highlighters/CPPHighlighter.h>
+#include <UI/Highlighters/WhiteTextHighlighter.h>
 
 // Get an instance of a supported and appropriate syntax highlighter for an extension
-// or return nullptr if none could be found
-inline std::unique_ptr<QSyntaxHighlighter> getSyntaxHighlighterFromExtension(QString extension) {
+// or return nullptr if none could be found. Memory cleanup is user's task.
+inline QSyntaxHighlighter* getSyntaxHighlighterFromExtension(QString extension) {
   if (extension == "cpp" || extension == "c" || extension == "h" ||
       extension == "cxx" || extension == "hpp")
   {
-    return std::make_unique<CPPHighlighter>();
-  }
-  return std::unique_ptr<QSyntaxHighlighter>();
+    return new CPPHighlighter();
+  }  
+  return new WhiteTextHighlighter();
 }
 
 template <typename T>

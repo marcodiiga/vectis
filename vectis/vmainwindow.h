@@ -7,7 +7,6 @@
 #include <QSyntaxHighlighter>
 #include <QDialog>
 #include <QPixmap>
-#include <memory>
 
 namespace Ui {
 class VMainWindow;
@@ -35,30 +34,31 @@ public:
     bool shotSet;
     tabTestFilter ttf; // DEBUG
 
-    void dragEnterEvent(QDragEnterEvent *event);
-    void dropEvent(QDropEvent *event);
-
     // Loads a new document from a file
     void loadDocumentFromFile(QString path, bool animation = false);
 
 private slots:
-   // void selectedTabChangedSlot(int oldId, int newId);
-   // void tabWasRequestedToCloseSlot(int tabId);
+   void selectedTabChangedSlot(int oldId, int newId);
+   void tabWasRequestedToCloseSlot(int tabId);
 
 private:
 
     Ui::VMainWindow *ui;
 
     // Window controls
-    std::unique_ptr<CodeTextEdit> m_customCodeEdit;
-    std::unique_ptr<TabsBar>      m_tabsBar;
+    CodeTextEdit *m_customCodeEdit;
+    TabsBar      *m_tabsBar;
 
     // A map associating QTextDocuments to tab ids (which are also document ids)
-    std::map <int, std::unique_ptr<QTextDocument> > m_tabDocumentMap;
+    std::map <int, QTextDocument*> m_tabDocumentMap;
     // A map that stores the vertical scrollbar position for each document (to remember it)
     std::map <int /* Document/Tab id */, int> m_tabDocumentVScrollPos;
     // A map that stores the syntax highlighter that a document might have
-    std::map <int /* Document/Tab id */, std::unique_ptr<QSyntaxHighlighter> > m_tabDocumentSyntaxHighlighter;
+    std::map <int /* Document/Tab id */, QSyntaxHighlighter*> m_tabDocumentSyntaxHighlighter;
+
+    void dragEnterEvent(QDragEnterEvent *event);
+    void dragMoveEvent(QDragMoveEvent *event);
+    void dropEvent(QDropEvent *event);
 };
 
 #endif // VMAINWINDOW_H
