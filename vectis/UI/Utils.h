@@ -19,4 +19,14 @@ inline std::unique_ptr<QSyntaxHighlighter> getSyntaxHighlighterFromExtension(QSt
   return std::unique_ptr<QSyntaxHighlighter>();
 }
 
+template <typename T>
+inline T clamp(T val, T min, T max) {
+  if (val < min)
+    return min;
+  else if (val > max)
+    return max;
+  else
+    return val;
+}
+
 #endif // UTILS_H

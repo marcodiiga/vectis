@@ -30,7 +30,7 @@ public:
     setFixedWidth(WIDTH);
     setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
     setAlignment(Qt::AlignRight);
-    this->setStyleSheet("QPlainTextEdit { \
+    this->setStyleSheet("QLabel { \
                              border-style: outset; \
                              border-width: 1px; \
                              border-color: red; \
@@ -71,9 +71,12 @@ public:
   }
 
   void leaveEvent(QEvent *event) {
-    if (m_hovering) {
+    if (m_hovering || m_dragging) {
       draw_document_pixmap(); // Restore (i.e. clear placeholder)
       m_hovering = false;
+      m_dragging = false;
+      //m_running_delta += m_last_valid_delta;
+      //qDebug() << "[SAVED RUNNING DELTA]";
     }
   }
 
@@ -82,17 +85,22 @@ public:
       return;
     int viewport_y = m_parent->getVScrollbarPos();
     int viewport_height = m_parent->viewport()->height();
-    QPixmap rectangle(MiniMap::WIDTH, viewport_height);
-    rectangle.fill(QColor(50, 50, 50, 160));
+
     QPixmap new_pixmap = this->pixmap()->copy();
     QPainter paint(&new_pixmap);
 
     auto dim = m_parent->getDocumentDimensions();
     // dim.width() : MiniMap::WIDTH = viewport_height : scaled_viewport_height
-    int scaled_viewport_height = (MiniMap::WIDTH * viewport_height) / dim.width();
+    float scaled_viewport_height = ((float)MiniMap::WIDTH * viewport_height) / dim.width();
     // dim.width() : MiniMap::WIDTH = viewport_y : scaled_viewport_y
-    int scaled_viewport_y = (MiniMap::WIDTH * viewport_y) / dim.width();
+    float scaled_viewport_y = ((float)MiniMap::WIDTH * viewport_y) / dim.width();
 
+    QPixmap rectangle(MiniMap::WIDTH, scaled_viewport_height);
+    rectangle.fill(QColor(50, 50, 50, 160));
+
+    // Draw the viewport area placeholder
+    //qDebug() << "[draw_viewport_placeholder] scaled_viewport_y - m_document_pixmap_offset = " << scaled_viewport_y - m_document_pixmap_offset <<
+    //            " scaled_viewport_y = " << scaled_viewport_y << " m_document_pixmap_offset = " << m_document_pixmap_offset;
     paint.drawPixmap(0, scaled_viewport_y - m_document_pixmap_offset, MiniMap::WIDTH, scaled_viewport_height, rectangle);
     QLabel::setPixmap(new_pixmap);
   }
@@ -101,29 +109,48 @@ public:
     if (!m_dragging)
       return;
 
-    auto viewport_height = m_parent->viewport()->height();
     auto dim = m_parent->getDocumentDimensions();
+    auto viewport_height = m_parent->viewport()->height();
+    auto scaled_viewport_height = ((float)MiniMap::WIDTH * viewport_height) / dim.width();
+
 
     // Delta from original mouse position
     float delta = ev->pos().y() - m_start_dragging_pos.y();
-    float percentage = delta / viewport_height;
+    float percentage = delta / (this->height() - scaled_viewport_height);
+    percentage = clamp(percentage, -1.f, 1.f);
 
     auto line_height = QFontMetrics(m_parent->getMonospaceFont()).height();
-    auto document_delta = (dim.height() / line_height) * percentage;
+
+    auto document_delta = ((dim.height() - m_parent->viewport()->height()) / line_height) * percentage;
     // Scaled delta to minimap height
     // dim.width() : MiniMap::WIDTH = dim.height() : scaled_delta
     //auto scaled_delta = (MiniMap::WIDTH * dim.height()) / dim.width();
     // Additional delta to have the document scrolled entirely in the minimap's height area
     // delta : viewport_height = document_pos : document_height
     //auto additional_delta = (delta * dim.height()) / viewport_height;
-
-    qDebug() << percentage;
 \
-    m_parent->verticalScrollBar()->setValue(m_start_dragging_scrollbar_pos + document_delta);
+    int new_scrollbar_value = m_start_dragging_scrollbar_pos + document_delta;
+    if (new_scrollbar_value < m_parent->verticalScrollBar()->minimum() || new_scrollbar_value > m_parent->verticalScrollBar()->maximum())
+      return;
 
+    //qDebug() << new_scrollbar_value;
 
-    int scaled_document_delta = (MiniMap::WIDTH * document_delta) / dim.width();
-    m_document_pixmap_offset = scaled_document_delta;
+    //qDebug() << m_parent->verticalScrollBar()->value();
+
+    //if (new_scrollbar_value < m_parent->verticalScrollBar()->minimum())
+      //m_document_pixmap_offset = 0;
+    //else if (new_scrollbar_value > m_parent->verticalScrollBar()->maximum()) {
+     // float scaled_doc_height = ((float)MiniMap::WIDTH * dim.height()) / dim.width();
+      //m_document_pixmap_offset = scaled_doc_height - this->height();
+    //} else {
+      m_parent->verticalScrollBar()->setValue(new_scrollbar_value);
+
+      updatePixmapOffsetFromScrollbar(percentage);
+      //qDebug() << "Last m_document_pixmap_offset: " << m_document_pixmap_offset << " with scaled_viewport_y = " <<
+      //            scaled_viewport_y << " and m_running_delta = "  << m_running_delta;
+   // }
+
+      //qDebug() << m_document_pixmap_offset;
 
     draw_document_pixmap(); // Restore (i.e. clear placeholder)
     draw_viewport_placeholder(); // Apply new placeholder at mouse position
@@ -131,6 +158,30 @@ public:
 
   void reset_highlighter(QString extension) {
     m_highlighter = std::move(getSyntaxHighlighterFromExtension(extension));
+  }
+
+  void updatePixmapOffsetFromScrollbar(float percentage = 0.f) {
+    // Update map and placeholder deltas
+    auto dim = m_parent->getDocumentDimensions();
+    auto viewport_height = m_parent->viewport()->height();
+    auto scaled_viewport_height = ((float)MiniMap::WIDTH * viewport_height) / dim.width();
+    float viewport_y = m_parent->getVScrollbarPos();
+    float scaled_viewport_y = ((float)MiniMap::WIDTH * viewport_y) / dim.width();
+
+    float m_running_delta = (
+                        // The percentage of the scrollbar itself (i.e. position where we were)
+                        (m_start_dragging_scrollbar_pos / m_parent->verticalScrollBar()->maximum())
+                        + percentage // Mouse delta percentage in the total scrollable area
+                       ) * (this->height() - scaled_viewport_height);
+
+//      qDebug() << "((float)m_start_dragging_scrollbar_pos / m_parent->verticalScrollBar()->maximum()): "
+//               << ((float)m_start_dragging_scrollbar_pos / m_parent->verticalScrollBar()->maximum()) << "\n"
+//               << "percentage:" << percentage << "\n"
+//               << "(this->height()- scaled_viewport_height):" << (this->height()- scaled_viewport_height) << "\n";
+
+    //int scaled_document_delta = (MiniMap::WIDTH * document_delta) / dim.width();
+    m_document_pixmap_offset = scaled_viewport_y - m_running_delta;
+
   }
 
   void setPixmap(const QPixmap& pixmap) {
@@ -146,6 +197,8 @@ public:
     pix.fill(Qt::transparent);
     QPainter paint(&pix);
 
+    // Draw the document pixmap
+    //qDebug() << "-m_document_pixmap_offset = " << -m_document_pixmap_offset;
     paint.drawPixmap(0, -m_document_pixmap_offset, pix.width(), pix.height(), m_document_pixmap);
 
     QLabel::setPixmap(pix);
@@ -167,11 +220,13 @@ static constexpr const int WIDTH = 150;
 
   QPixmap m_document_pixmap; // Unmodified document pixmap without hover rectangles or translations
   float m_document_pixmap_offset = 0.f; // Y offset for the document pixmap to be shown
+  //float m_running_delta = 0.f;
+  //float m_last_valid_delta = 0.f;
   QPixmap m_old_pixmap_before_hovering;
   bool m_hovering = false;
   bool m_dragging = false;
   QPoint m_start_dragging_pos;
-  int m_start_dragging_scrollbar_pos;
+  float m_start_dragging_scrollbar_pos = 0.f;
   QPixmap m_map;
   QVector<QTextBlock> m_blocks;
   QVector<QPixmap> m_blocks_pixmaps;
@@ -264,6 +319,14 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
   //getScreenShot(m_minimap->map());
 
 
+  connect(verticalScrollBar(), &QScrollBar::valueChanged, this, [&](int value) {
+    qDebug() << "value changed";
+    if (!m_minimap->m_dragging) {
+      m_minimap->m_start_dragging_scrollbar_pos = verticalScrollBar()->value();
+      m_minimap->updatePixmapOffsetFromScrollbar();
+      m_minimap->draw_document_pixmap();
+    }
+  });
 
 }
 
@@ -307,23 +370,7 @@ void CodeTextEdit::setDocument(QTextDocument *document) {
     //auto document = this->document()->clone(m_minimap);
     //document->setDocumentLayout(this->document()->documentLayout());
 
-    QSizeF dim = getDocumentDimensions();
-    QRect rect(0, 0, dim.width(), dim.height());
-
-    QPixmap pixmap(rect.width(), rect.height());
-    pixmap.fill(Qt::transparent);
-
-    QRegion region(rect);
-    //this->render(&pixmap, QPoint(0, 0), region);
-    renderDocument(pixmap);
-    //pixmap.save("test.png");
-
-    Qt::AspectRatioMode aspect_ratio_mode = Qt::KeepAspectRatioByExpanding;
-    if (dim.height() / m_minimap->height() <= dim.width() / MiniMap::WIDTH) {
-      qDebug() << "SWITCHING";
-      aspect_ratio_mode = Qt::KeepAspectRatio;
-    }
-    m_minimap->setPixmap(pixmap.scaled(MiniMap::WIDTH, m_minimap->height(), aspect_ratio_mode, Qt::SmoothTransformation));
+    this->regenerateMiniMap();
 
     //m_minimap->document()->setPlainText(this->document()->toPlainText());
   //  m_minimap->setDocument(this->document());
@@ -425,7 +472,30 @@ void CodeTextEdit::setDocument(QTextDocument *document) {
   //  });
 }
 
-int CodeTextEdit::getVScrollbarPos() const {
+void CodeTextEdit::regenerateMiniMap() {
+  QSizeF dim = getDocumentDimensions();
+  QRect rect(0, 0, dim.width(), dim.height());
+  qDebug() << rect;
+
+  QPixmap pixmap(rect.width(), rect.height());
+  pixmap.fill(Qt::transparent);
+
+  QRegion region(rect);
+  //this->render(&pixmap, QPoint(0, 0), region);
+  renderDocument(pixmap);
+  //pixmap.save("test.png");
+
+  Qt::AspectRatioMode aspect_ratio_mode = Qt::KeepAspectRatioByExpanding;
+  // KeepAspectRatioByExpanding keeps the width scaled and expands on the height, but this only
+  // works if the document_width / minimap_width ratio is greater than document_height / minimap_height,
+  // otherwise the height is kept scaled and the width is expanded (not what we want). Therefore we
+  // switch to a KeepAspectRatio (both width and height) are resized
+  if (dim.height() / m_minimap->height() <= dim.width() / MiniMap::WIDTH)
+    aspect_ratio_mode = Qt::KeepAspectRatio;
+  m_minimap->setPixmap(pixmap.scaled(MiniMap::WIDTH, m_minimap->height(), aspect_ratio_mode, Qt::SmoothTransformation));
+}
+
+float CodeTextEdit::getVScrollbarPos() const {
   auto line_height = QFontMetrics(getMonospaceFont()).height();
   return ((float)this->verticalScrollBar()->value() * line_height);
 }
@@ -458,6 +528,13 @@ void CodeTextEdit::paintEvent(QPaintEvent *e)
 
 }
 
+void CodeTextEdit::resizeEvent(QResizeEvent *e) {
+
+  QPlainTextEdit::resizeEvent(e);
+
+  regenerateMiniMap();
+}
+
 QFont CodeTextEdit::getMonospaceFont() const {
   return m_monospaceFont;
 }
@@ -474,7 +551,10 @@ QSizeF CodeTextEdit::getDocumentDimensions() const {
 //  }
 
   auto line_height = QFontMetrics(getMonospaceFont()).height();
-  return QSizeF(document()->size().width(), document()->size().height() * line_height);
+  this->document()->adjustSize(); // document()->size().width() returns the viewport width (i.e. much wider than
+                                  // the actual contained text)
+  auto ideal_width = document()->idealWidth();
+  return QSizeF((ideal_width > 0) ? ideal_width : document()->size().width(), document()->size().height() * line_height);
 }
 
 // Expensive - renders the entire document on the given pixmap

@@ -18,11 +18,13 @@ public:
     void renderBlock(QPainter &painter, const QTextBlock &block) const;
     void setDocument(QTextDocument *document);
 
-    int getVScrollbarPos() const;
+    float getVScrollbarPos() const;
     void paintEvent(QPaintEvent *e);
+    void resizeEvent(QResizeEvent *e);
 private:
     QFont m_monospaceFont;
     MiniMap *m_minimap = nullptr;
+    void regenerateMiniMap();
 };
 
 #endif // CUSTOMCODEEDIT_H
