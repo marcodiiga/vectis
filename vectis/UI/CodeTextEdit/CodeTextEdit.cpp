@@ -101,10 +101,14 @@ public:
     QPixmap rectangle(MiniMap::WIDTH, scaled_viewport_height);
     rectangle.fill(QColor(50, 50, 50, 160));
 
-    // Draw the viewport area placeholder
-    //qDebug() << "[draw_viewport_placeholder] scaled_viewport_y - m_document_pixmap_offset = " << scaled_viewport_y - m_document_pixmap_offset <<
-    //            " scaled_viewport_y = " << scaled_viewport_y << " m_document_pixmap_offset = " << m_document_pixmap_offset;
-    paint.drawPixmap(0, scaled_viewport_y - m_document_pixmap_offset, MiniMap::WIDTH, scaled_viewport_height, rectangle);
+    auto offset = -m_document_pixmap_offset;
+
+    float scaled_doc_height = ((float)MiniMap::WIDTH * dim.height()) / dim.width();
+    if (scaled_doc_height < this->height())
+      offset = 0; // Do not move the pixmap if it can safely be drawn into our area
+
+    // Draw the viewport area placeholder    
+    paint.drawPixmap(0, scaled_viewport_y + offset, MiniMap::WIDTH, scaled_viewport_height, rectangle);
     QLabel::setPixmap(new_pixmap);
   }
 
@@ -124,7 +128,13 @@ public:
 
     auto line_height = QFontMetrics(m_parent->getMonospaceFont()).height();
 
-    auto document_delta = ((dim.height() - m_parent->viewport()->height()) / line_height) * percentage;
+    // Add a scroll-acceleration factor if the document is very small
+    float factor = 1.f;
+    float scaled_doc_height = ((float)MiniMap::WIDTH * dim.height()) / dim.width();
+    if (scaled_doc_height < this->height())
+      factor = this->height() / scaled_doc_height; // Do not move the pixmap if it can safely be drawn into our area
+
+    auto document_delta = ((dim.height() - m_parent->viewport()->height()) / line_height) * percentage * factor;
     // Scaled delta to minimap height
     // dim.width() : MiniMap::WIDTH = dim.height() : scaled_delta
     //auto scaled_delta = (MiniMap::WIDTH * dim.height()) / dim.width();
@@ -133,7 +143,9 @@ public:
     //auto additional_delta = (delta * dim.height()) / viewport_height;
 \
     int new_scrollbar_value = m_start_dragging_scrollbar_pos + document_delta;
-    if (new_scrollbar_value < m_parent->verticalScrollBar()->minimum() || new_scrollbar_value > m_parent->verticalScrollBar()->maximum())
+    if (!m_parent->verticalScrollBar()->isVisible() ||
+        new_scrollbar_value < m_parent->verticalScrollBar()->minimum() ||
+        new_scrollbar_value > m_parent->verticalScrollBar()->maximum())
       return;
 
     //qDebug() << new_scrollbar_value;
@@ -203,7 +215,15 @@ public:
 
     // Draw the document pixmap
     //qDebug() << "-m_document_pixmap_offset = " << -m_document_pixmap_offset;
-    paint.drawPixmap(0, -m_document_pixmap_offset, pix.width(), pix.height(), m_document_pixmap);
+
+    auto offset = -m_document_pixmap_offset;
+
+    auto dim = m_parent->getDocumentDimensions();
+    float scaled_doc_height = ((float)MiniMap::WIDTH * dim.height()) / dim.width();
+    if (scaled_doc_height < this->height())
+      offset = 0; // Do not move the pixmap if it can safely be drawn into our area
+
+    paint.drawPixmap(0, offset, pix.width(), pix.height(), m_document_pixmap);
 
     QLabel::setPixmap(pix);
   }
@@ -268,7 +288,7 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   QPalette p = this->palette();
   p.setBrush(QPalette::HighlightedText, QBrush());
   p.setColor(QPalette::Text, Qt::white);
-  p.setColor(QPalette::Base, Qt::white);
+  p.setColor(QPalette::WindowText, Qt::white);
   this->setPalette(p);
 
   //this->setWordWrapMode(QTextOption::ManualWrap); // We'll deal with the wrap ourselves
@@ -378,15 +398,19 @@ void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
 
   QPlainTextEdit::setDocument(document); // Continue with base class handling
 
+  this->verticalScrollBar()->setValue(scrollbar_pos);
+
+  m_first_time_redraw = true;
 
   connect(this->document(), &QTextDocument::contentsChanged, this, [&]() {
 
-    if (m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 200) {
+    if (!m_first_time_redraw && m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 200) {
       // We're receiving lots of document modifications in a limited amount of time,
       // slow down with the minimap regeneration
       m_regenerate_minimap_delay.stop();
       m_regenerate_minimap_delay.setInterval(200);
       m_regenerate_minimap_delay.setSingleShot(true);
+      m_first_time_redraw = false;
     } else {
       m_regenerate_minimap_delay.stop();
       this->regenerateMiniMap();
@@ -394,8 +418,6 @@ void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
     }
 
   });
-
-  this->verticalScrollBar()->setValue(scrollbar_pos);
 }
 
 void CodeTextEdit::unloadDocument() {
@@ -428,6 +450,12 @@ void CodeTextEdit::regenerateMiniMap() {
   if (dim.height() / m_minimap->height() <= dim.width() / MiniMap::WIDTH)
     aspect_ratio_mode = Qt::KeepAspectRatio;
   m_minimap->setPixmap(pixmap.scaled(MiniMap::WIDTH, m_minimap->height(), aspect_ratio_mode, Qt::SmoothTransformation));
+
+  m_minimap->m_start_dragging_scrollbar_pos = verticalScrollBar()->value();
+  m_minimap->updatePixmapOffsetFromScrollbar();
+  m_minimap->draw_document_pixmap();
+  if (m_minimap->m_hovering)
+    m_minimap->draw_viewport_placeholder();
 }
 
 float CodeTextEdit::getVScrollbarPos() const {
@@ -453,10 +481,15 @@ QFont CodeTextEdit::getMonospaceFont() const {
 QSizeF CodeTextEdit::getDocumentDimensions() const {
 
   auto line_height = QFontMetrics(getMonospaceFont()).height();
-  this->document()->adjustSize(); // document()->size().width() returns the viewport width (i.e. much wider than
+  //this->document()->adjustSize(); // document()->size().width() returns the viewport width (i.e. much wider than
                                   // the actual contained text)
-  auto ideal_width = document()->idealWidth();
-  return QSizeF((ideal_width > 0) ? ideal_width : document()->size().width(), document()->size().height() * line_height);
+  //auto ideal_width = document()->idealWidth();
+  //auto char_width = QFontMetrics(getMonospaceFont()).width("A");
+  //qDebug() << document()->size().width();
+  auto width = document()->size().width();
+  if (width < 200)
+    width = 200;
+  return QSizeF(width, document()->size().height() * line_height);
 }
 
 // Expensive - renders the entire document on the given pixmap

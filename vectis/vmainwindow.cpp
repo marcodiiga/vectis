@@ -53,7 +53,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
+  loadDocumentFromFile("../vectis/TestData/PlainText.txt", false);
 
   // Load some other sample data
   //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);

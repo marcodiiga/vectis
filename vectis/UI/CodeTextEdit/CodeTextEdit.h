@@ -27,6 +27,7 @@ public:
 private:
     QFont m_monospaceFont;
     MiniMap *m_minimap = nullptr;
+    bool m_first_time_redraw = true;
     void regenerateMiniMap();
     bool eventFilter(QObject *target, QEvent *event);
     QDateTime m_last_document_modification;
