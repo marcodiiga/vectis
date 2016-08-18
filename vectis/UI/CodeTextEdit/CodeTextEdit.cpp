@@ -288,8 +288,9 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
                             selection-color: none; \
                           } \
   " );
-  setViewportMargins(0, 0, MiniMap::WIDTH, 0);
+  setViewportMargins(0, 0, MiniMap::WIDTH, 0); // Prevent text from going under the minimap
   setAcceptDrops(false);
+  viewport()->setAttribute(Qt::WA_KeyCompression, true);
 
   // Disable highlighted text brush (i.e. use an empty brush to paint over)
   QPalette p = this->palette();
@@ -297,13 +298,6 @@ CodeTextEdit::CodeTextEdit(QWidget *parent) :
   p.setColor(QPalette::Text, Qt::white);
   p.setColor(QPalette::WindowText, Qt::white);
   this->setPalette(p);
-
-  //this->setWordWrapMode(QTextOption::ManualWrap); // We'll deal with the wrap ourselves
-
-
-  //setLineWrapMode(LineWrapMode::NoWrap);
-  //setLineWidth(23);
-  //setWordWrapMode(QTextOption::WrapAnywhere);
 
 #ifdef _WIN32
   m_monospaceFont.setFamily( "Consolas" );
@@ -411,13 +405,13 @@ void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
 
   connect(this->document(), &QTextDocument::contentsChanged, this, [&]() {
 
-    if (!m_first_time_redraw && m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 200) {
+    if (!m_first_time_redraw && m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 500) {
       // We're receiving lots of document modifications in a limited amount of time,
       // slow down with the minimap regeneration
       m_regenerate_minimap_delay.stop();
-      m_regenerate_minimap_delay.setInterval(200);
-      m_regenerate_minimap_delay.setSingleShot(true);
+      m_regenerate_minimap_delay.setInterval(500);
       m_first_time_redraw = false;
+      m_regenerate_minimap_delay.start();
     } else {
       m_regenerate_minimap_delay.stop();
       this->regenerateMiniMap();
@@ -479,7 +473,8 @@ void CodeTextEdit::resizeEvent(QResizeEvent *e) {
 
   QPlainTextEdit::resizeEvent(e);
 
-  regenerateMiniMap();
+  m_regenerate_minimap_delay.stop();
+  m_regenerate_minimap_delay.start();
 }
 
 QFont CodeTextEdit::getMonospaceFont() const {

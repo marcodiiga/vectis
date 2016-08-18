@@ -32,12 +32,11 @@ VMainWindow::VMainWindow(QWidget *parent) :
   // more portable than modifying the palette directly
   this->setStyleSheet("QDialog { background-color: #272822; }");
 
-  this->setAcceptDrops(true);
+  this->setAcceptDrops(true);  
 
   ui->setupUi(this);
 
-
-
+  this->resize(1100, 600);
 
   // Create the TabsBar
   m_tabsBar = new TabsBar(this);
@@ -53,7 +52,7 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
 
   // Load the sample data
-  loadDocumentFromFile("../vectis/TestData/PlainText.txt", false);
+  loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
 
   // Load some other sample data
   //loadDocumentFromFile("../vectis/TestData/BasicBlock.cpp", false);
