@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QSyntaxHighlighter>
+#include <QApplication>
 #include <algorithm>
 
 #include <QDebug>
@@ -369,6 +370,7 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 
   // Install filter to reroute events we're interested in
   m_minimap->installEventFilter(this);
+  this->installEventFilter(this);
 
   // Callback for too-fast-typing delay
   connect(&m_regenerate_minimap_delay, &QTimer::timeout, this, [&]() {
@@ -379,16 +381,25 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 }
 
 bool CodeTextEdit::eventFilter(QObject *target, QEvent *event) {
-    if(target == m_minimap ) {
-        if (event->type() == QEvent::Wheel) {
-          this->wheelEvent((QWheelEvent*)event);
-          return true;
-        } else {
-          event->ignore();
-          return false;
-        }
+  if(target == m_minimap ) {
+      if (event->type() == QEvent::Wheel) {
+        this->wheelEvent((QWheelEvent*)event);
+        return true;
+      } else {
+        event->ignore();
+        return false;
+      }
+  }
+  if (target == this && event->type() == QEvent::KeyPress) {
+    QKeyEvent* e = static_cast<QKeyEvent*>(event);
+    if (e->key() == Qt::Key_Tab && e->modifiers() == Qt::NoModifier) { // Tab -> 4 spaces
+      QKeyEvent *spaces_event = new QKeyEvent ( QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier, "    ", false, 0 );
+      QApplication::postEvent (this, spaces_event);
+      return true;
     }
-    return QPlainTextEdit::eventFilter(target, event);
+  }
+
+  return QPlainTextEdit::eventFilter(target, event);
 }
 
 void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
@@ -405,16 +416,18 @@ void CodeTextEdit::setDocument(QTextDocument *document, int scrollbar_pos) {
 
   connect(this->document(), &QTextDocument::contentsChanged, this, [&]() {
 
-    if (!m_first_time_redraw && m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 500) {
+    // TODO: this might as well be moved into another thread. For now, it isn't much of a big deal.
+    if (m_first_time_redraw == false && m_last_document_modification.msecsTo(QDateTime::currentDateTime()) < 200) {
       // We're receiving lots of document modifications in a limited amount of time,
       // slow down with the minimap regeneration
-      m_regenerate_minimap_delay.stop();
-      m_regenerate_minimap_delay.setInterval(500);
-      m_first_time_redraw = false;
+      qDebug() << "SLOW DOWN!\n";
       m_regenerate_minimap_delay.start();
+      m_last_document_modification = QDateTime::currentDateTime();
     } else {
       m_regenerate_minimap_delay.stop();
+      qDebug() << "Regenerating..\n";
       this->regenerateMiniMap();
+      m_first_time_redraw = false;
       m_last_document_modification = QDateTime::currentDateTime();
     }
 
