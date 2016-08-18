@@ -228,6 +228,13 @@ public:
     QLabel::setPixmap(pix);
   }
 
+  void clear_document_pixmap() { // Cleanup
+    QPixmap pix(MiniMap::WIDTH, 20);
+    pix.fill(Qt::transparent);
+    QLabel::setPixmap(pix);
+    m_document_pixmap = pix;
+  }
+
   QPixmap& map() {
     return m_map;
   }
@@ -425,6 +432,7 @@ void CodeTextEdit::unloadDocument() {
     //delete this->document();
   this->document()->disconnect(this);
   QPlainTextEdit::setDocument(nullptr);
+  m_minimap->clear_document_pixmap();
   this->setEnabled(false);
 }
 

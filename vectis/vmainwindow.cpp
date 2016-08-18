@@ -62,8 +62,8 @@ VMainWindow::VMainWindow(QWidget *parent) :
 
   // NOTICE: link connections AFTER all initial documents have been created
   // Link the "changed selected tab" and "tab was requested to close" signals to slots
-//  connect(m_tabsBar.get(), SIGNAL(selectedTabHasChanged(int, int)),
-//          this, SLOT(selectedTabChangedSlot(int, int)));
+  connect(m_tabsBar, SIGNAL(selectedTabHasChanged(int, int)),
+          this, SLOT(selectedTabChangedSlot(int, int)));
   connect(m_tabsBar, SIGNAL(tabWasRequestedToClose(int)),
           this, SLOT(tabWasRequestedToCloseSlot(int)));
 
@@ -177,7 +177,7 @@ void VMainWindow::tabWasRequestedToCloseSlot(int tabId) {
 
   {
     // Delete document and tab id
-    auto it = m_tabDocumentMap.find(tabId);
+    auto it = m_tabDocumentMap.find(tabId);    
     m_tabDocumentMap.erase(it);
 
     // Also delete the VScrollBar position history (if any)
