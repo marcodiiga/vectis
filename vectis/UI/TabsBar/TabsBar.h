@@ -7,6 +7,7 @@
 #include <memory>
 #include <functional>
 #include <set>
+#include <QPainterPath>
 
 #define TAB_MAXIMUM_WIDTH 150
 #define TAB_INTERSECTION_DELTA 20
